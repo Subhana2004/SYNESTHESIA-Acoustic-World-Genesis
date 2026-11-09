@@ -74,3 +74,7 @@ footer{display:flex;justify-content:space-between;padding:22px 0 34px;color:#6e7
 .journal-entry p{min-height:36px;margin:0 0 11px;color:#969bb2;font-size:10px;line-height:1.6}
 .journal-entry small{display:block;color:#777e9e;font:7px var(--mono);letter-spacing:.08em;line-height:1.6}
 @media(max-width:520px){.discovery-journal{padding:13px}.journal-grid{grid-template-columns:1fr 1fr}.journal-entry{padding:11px}.journal-entry h3{font-size:12px}.journal-entry p{font-size:9px}}
+
+.world-exploration-track{display:block;height:3px;margin-top:5px;overflow:hidden;background:rgba(133,143,170,.16)}
+.world-exploration-track>span{display:block;height:100%;background:linear-gradient(90deg,#4caa91,#a58cff);transition:width .25s ease}
+.world-card-meta:last-of-type{color:#9bd7ce}
