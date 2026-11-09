@@ -36,6 +36,7 @@ export default function App() {
   const [landmarks, setLandmarks] = useState<WorldLandmark[]>(() => discoverWorldLandmarks(terrain))
   const [discoveredIds, setDiscoveredIds] = useState<string[]>([])
   const [worldEvents, setWorldEvents] = useState<WorldEvent[]>([])
+  const [showAllEvents, setShowAllEvents] = useState(false)
   const generationProgress = Math.min(100, Math.max(0, ((terrain.frontX + terrain.worldWidth * 0.42) / (terrain.worldWidth * 0.84)) * 100))
 
   useEffect(() => {
@@ -185,7 +186,7 @@ export default function App() {
 
     <section className="world">
       <div className="world-head"><span>WORLD / 001</span><span className={listening ? 'live' : ''}><i /> {listening ? 'LISTENING' : 'WORLD AT REST'} · {soundPattern.toUpperCase()}</span></div>
-      <div className="viewport" ref={viewport} onPointerDown={event => { pointerStart.current = { x: event.clientX, y: event.clientY } }} onPointerUp={event => { const startPoint = pointerStart.current; pointerStart.current = null; if (!startPoint || Math.hypot(event.clientX - startPoint.x, event.clientY - startPoint.y) > 7) return; const landmarkId = scene.current?.pickDiscoveryAt(event.clientX, event.clientY); if (landmarkId) { discoverLandmark(landmarkId); return } const result = scene.current?.inspectAt(event.clientX, event.clientY); if (result) inspectLocation(result.x, result.z) }}>
+      <div className="viewport" ref={viewport} onPointerDown={event => { pointerStart.current = { x: event.clientX, y: event.clientY } }} onPointerUp={event => { const startPoint = pointerStart.current; pointerStart.current = null; if (!startPoint || Math.hypot(event.clientX - startPoint.x, event.clientY - startPoint.y) > 7) return; const landmarkId = scene.current?.pickDiscoveryAt(event.clientX, event.clientY); if (landmarkId) { discoverLandmark(landmarkId); return } const eventId = scene.current?.pickWorldEventAt(event.clientX, event.clientY); if (eventId) { const worldEvent = worldEvents.find(item => item.id === eventId); if (worldEvent) inspectLocation(worldEvent.x, worldEvent.z); return } const result = scene.current?.inspectAt(event.clientX, event.clientY); if (result) inspectLocation(result.x, result.z) }}>
         <div className="hint">DRAG TO ORBIT · SCROLL TO EXPLORE</div>
         <div className="view-controls" aria-label="Camera controls" onPointerDown={event => event.stopPropagation()}><button className="view-reset" onClick={() => scene.current?.zoomBy(0.82)} aria-label="Zoom in">+</button><button className="view-reset" onClick={() => scene.current?.zoomBy(1.22)} aria-label="Zoom out">−</button><button className="view-reset" onClick={() => scene.current?.resetCamera()} aria-label="Reset camera view">RESET</button></div>
         <div className="coords">X {terrain.frontX.toFixed(1)} · SEED {terrain.seed}</div>
@@ -222,12 +223,13 @@ export default function App() {
 
     <section className="world-event-journal">
       <div className="journal-heading"><div><div className="eyebrow">WORLD PHENOMENA</div><h2>Event journal</h2></div><span>{worldEvents.length} / 100 RECORDED</span></div>
-      {worldEvents.length ? <div className="event-list">{worldEvents.slice().reverse().slice(0, 6).map(event => <article className={`event-entry event-${event.kind}`} key={event.id}>
+      {worldEvents.length ? <div className="event-list">{(showAllEvents ? worldEvents : worldEvents.slice(-6)).slice().reverse().map(event => <button type="button" className={`event-entry event-${event.kind}`} key={event.id} onClick={() => inspectLocation(event.x, event.z)} aria-label={`Inspect ${event.kind.replaceAll('-', ' ')} at ${event.x.toFixed(1)}, ${event.z.toFixed(1)}`}>
         <span>{event.biome.toUpperCase()} · {event.kind.replaceAll('-', ' ').toUpperCase()}</span>
         <strong>{event.kind === 'meteor-shower' ? 'Meteor shower' : event.kind === 'aurora' ? 'Highland aurora' : event.kind === 'echo-bloom' ? 'Echo bloom' : 'Mire lights'}</strong>
         <small>INTENSITY {Math.round(event.intensity * 100)}% · WORLD POSITION {event.x.toFixed(1)}, {event.z.toFixed(1)}</small>
-      </article>)}</div> : <p className="event-empty">No rare phenomena recorded yet. Strong accents, sustained high tones and steady rhythms can awaken events in the right biome.</p>}
-      <p className="event-footnote">Events leave persistent markers in this world. Up to 100 are kept in its local journal.</p>
+      </button>)}</div> : <p className="event-empty">No rare phenomena recorded yet. Strong accents, sustained high tones and steady rhythms can awaken events in the right biome.</p>}
+      {worldEvents.length > 6 && <button className="secondary event-toggle" type="button" onClick={() => setShowAllEvents(value => !value)}>{showAllEvents ? 'SHOW RECENT EVENTS' : `SHOW ALL ${worldEvents.length} EVENTS`}</button>}
+      <p className="event-footnote">Select a journal entry or its 3D marker to inspect where it occurred. Up to 100 are kept in this world.</p>
     </section>
 
     <section className="panel">
