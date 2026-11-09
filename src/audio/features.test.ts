@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { estimatePitch, mapAcoustics, type AcousticFeatures } from './features'
+import { estimatePitch, mapAcoustics, mapAtmosphere, type AcousticFeatures } from './features'
 
 function sine(frequency: number, sampleRate = 48000, size = 2048): Float32Array {
   return Float32Array.from({ length: size }, (_, i) => Math.sin(2 * Math.PI * frequency * i / sampleRate) * 0.5)
@@ -47,5 +47,22 @@ describe('acoustic mapping', () => {
   })
   it('marks pitch unavailable when no estimate exists', () => {
     expect(mapAcoustics({ ...sample, pitchHz: null, pitchConfidence: 0 }).pitchAvailable).toBe(false)
+  })
+})
+describe('atmosphere mapping', () => {
+  it('maps higher spectral brightness toward violet', () => {
+    const low = mapAtmosphere({ ...sample, spectralCentroidHz: 300 })
+    const high = mapAtmosphere({ ...sample, spectralCentroidHz: 5000 })
+    expect(low.spectralBlend).toBeLessThan(high.spectralBlend)
+  })
+  it('keeps onset pulses and energy bounded', () => {
+    const controls = mapAtmosphere({ ...sample, onsetStrength: 1.8, rms: 0.5 })
+    expect(controls.onsetPulse).toBe(1)
+    expect(controls.energy).toBe(1)
+  })
+  it('does not emit an onset pulse during silence', () => {
+    const controls = mapAtmosphere({ ...sample, isSilent: true, onsetStrength: 1 })
+    expect(controls.onsetPulse).toBe(0)
+    expect(controls.energy).toBe(0)
   })
 })
