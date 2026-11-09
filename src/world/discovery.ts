@@ -29,9 +29,10 @@ export function discoverWorldLandmarks(terrain: TerrainState, traces: readonly S
   let lowest = { col: 0, row: 0, height: Infinity }
   let highest = { col: 0, row: 0, height: -Infinity }
   let grove = { col: 0, row: 0, height: -Infinity, score: -Infinity }
+  const margin = terrain.size > 6 ? 2 : 0
 
-  for (let row = 2; row < terrain.size - 2; row += 1) {
-    for (let col = 2; col < terrain.size - 2; col += 1) {
+  for (let row = margin; row < terrain.size - margin; row += 1) {
+    for (let col = margin; col < terrain.size - margin; col += 1) {
       const height = terrain.heights[row * terrain.size + col]
       if (height < lowest.height) lowest = { col, row, height }
       if (height > highest.height) highest = { col, row, height }
