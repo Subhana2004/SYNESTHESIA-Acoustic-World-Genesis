@@ -42,6 +42,7 @@ The current branch contains a first end-to-end prototype with M4 environmental c
 
 - M4.6 renders three expanding spatial wavefronts at the active generation point. Onset strength reveals each ripple, spectral brightness shifts it from teal to violet, signal energy expands its reach, and stable pitch changes propagation speed and spread. The effect is transient and does not modify terrain or saved-world data.
 - M4.7 adds a bounded, fixed-size field of drifting sound motes around the active generation point. Pitch changes their orbital drift, energy and onsets expand and brighten the field, and spectral brightness controls its teal/violet tint.
+- M4.8 classifies recent feature windows into ambient, sustained, accent and rhythmic patterns using only energy and a bounded history of onset timestamps. Sustained tones change cloud drift and mote movement, sharp accents briefly scale floating rocks, and stable rhythmic pulses animate flora, water and rock rotation. No raw audio is stored.
 
 ## M2 visual and behaviour decisions
 
@@ -54,7 +55,7 @@ See M2_DESIGN.md for the full design and acceptance criteria.
 
 ## Verification status
 
-GitHub Actions passed unit tests and the production build for M4.6 at commit e05f6e1. M4.7 sound-mote changes are committed and awaiting their own CI run. Browser microphone/rendering checks, IndexedDB save/reload validation and target-device profiling remain outstanding.
+GitHub Actions passed unit tests and the production build for M4.6 at commit e05f6e1. M4.7 sound-mote changes passed unit tests and the production build at commit b765a09. M4.8 sound-pattern classification and environmental responses are committed and awaiting CI. Browser microphone/rendering checks, IndexedDB save/reload validation and target-device profiling remain outstanding.
 
 ## Known limitations
 
@@ -68,7 +69,7 @@ GitHub Actions passed unit tests and the production build for M4.6 at commit e05
 
 ## Next steps
 
-1. Confirm CI for M4.7 sound-responsive motes.
+1. Confirm CI for M4.8 sound-pattern classification and environmental responses.
 2. Validate save → reload → restore in a real browser, including malformed or unavailable storage.
 3. Inspect biome transitions, water placement, reflections, camera framing and visual balance.
 4. Plan export/import and undo after the versioned world format is validated.
