@@ -169,7 +169,7 @@ export default function App() {
 
 
     <section className="discovery-journal">
-      <div className="journal-heading"><div><div className="eyebrow">WORLD DISCOVERY</div><h2>Field journal</h2></div><span>{discoveredIds.length} / {landmarks.length} FOUND</span></div>
+      <div className="journal-heading"><div><div className="eyebrow">WORLD DISCOVERY</div><h2>Field journal</h2></div><span>{discoveredIds.length} / {landmarks.length} FOUND · {landmarks.length ? Math.round(discoveredIds.filter(id => landmarks.some(item => item.id === id)).length / landmarks.length * 100) : 0}% EXPLORED</span></div>
       <div className="journal-grid">{landmarks.map(item => {
         const found = discoveredIds.includes(item.id)
         return <article className={found ? 'journal-entry found' : 'journal-entry unfound'} key={item.id}>
@@ -198,7 +198,7 @@ export default function App() {
           <button className="secondary" onClick={reset}>Reset world</button>
         </div>
       </div>
-      <WorldMemory terrain={terrain} history={history} stop={stop} onWorldChange={(count) => {
+      <WorldMemory terrain={terrain} history={history} discoveredIds={discoveredIds} stop={stop} onWorldChange={(count, restoredDiscoveredIds = []) => {
         scene.current?.updateTerrain()
         scene.current?.clearInspection()
         scene.current?.updateSoundTraces(history.current)
@@ -209,7 +209,7 @@ export default function App() {
         setSoundPattern('ambient')
         setInspection(null)
         setNearbyTrace(null)
-        setDiscoveredIds([])
+        setDiscoveredIds(restoredDiscoveredIds)
         const restoredLandmarks = discoverWorldLandmarks(terrain, deriveSoundTraces(terrain, history.current))
         setLandmarks(restoredLandmarks)
         scene.current?.updateDiscoveries(restoredLandmarks)
