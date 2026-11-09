@@ -144,6 +144,7 @@ export default function App() {
 
   const reset = () => {
     stop()
+    setError('')
     const fresh = createTerrain()
     terrain.heights.set(fresh.heights)
     terrain.frontX = fresh.frontX
