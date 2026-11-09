@@ -1,82 +1,70 @@
-# Project Status
+# SYNESTHESIA — Project Status
 
 Last updated: 2026-11-10
 
-## Milestones
+## Milestone status
 
-| Milestone | Status | Evidence / notes |
+| Milestone | Status | Delivered |
 |---|---|---|
-| M0 — Architecture and feasibility | In progress | Architecture and risk decisions documented in ARCHITECTURE.md |
-| M1 — Audio foundation | In progress | Browser microphone capture and initial feature extraction scaffolded; automated verification still needs confirmation |
-| M2 — Acoustic terrain genesis | Initial implementation in progress | Hybrid landforms, dark renderer palette, sound-reactive teal/violet lighting and onset accents committed |
-| M3 — Persistence and replay | Initial implementation in progress | IndexedDB save/load, visual world gallery, rename/delete, portable JSON export/import and deterministic feature-stream replay committed; browser validation pending |
-| M4 — Environment construction | Initial implementation in progress | Biome-specific mire reeds, echo-forest mushrooms and crystal growths are placed by elevation; their emissive pulses and breathing scale respond to live energy and onset accents |
-| M5 — Visual and interaction refinement | Not started | Accessibility, responsive controls and performance profiling remain outstanding |
-| M6 — Integration and validation | Not started | Full browser/device validation remains outstanding |
+| M0 — Architecture and feasibility | Complete | Browser-first architecture, privacy boundary, deterministic terrain and risk decisions |
+| M1 — Audio foundation | Complete | Opt-in Web Audio capture, RMS, confidence-gated pitch, spectral centroid and onset features |
+| M2 — Acoustic terrain genesis | Complete | Seeded hybrid terrain, bounded sound-driven sculpting, dark 3D renderer and camera exploration |
+| M3 — Persistence and replay | Complete | IndexedDB gallery, save/load, rename/delete, deterministic feature replay, validated JSON import/export and per-world discovery/event state |
+| M4 — Environment construction | Complete | Three elevation biomes, biome-specific flora, floating rocks, clouds, mist, water, sound waves, motes, sound traces and procedural phenomena |
+| M5 — Visual and interaction refinement | Complete | Responsive controls, camera tools, minimap, field notes, landmark discovery, event journal, keyboard exploration, per-world statistics and resource lifecycle fixes |
+| M6 — Integration and validation | In progress | Unit/build CI is established; Playwright desktop/mobile browser smoke tests have been added and await the first full CI result |
 
-## Current implementation
+## Current feature set
 
-The current branch contains a first end-to-end prototype with M4 environmental construction and sound-responsive visual effects:
-- User-initiated microphone access through Web Audio API.
-- RMS, confidence-gated autocorrelation pitch, spectral centroid and onset estimate.
-- Deterministic acoustic mapping.
-- Seeded hybrid heightfield with rolling forms, ridge lines, basin and mountain-like peaks.
-- Bounded localized terrain deformation and a moving generation front.
-- Dark navy/purple scene palette, distance fog, cool directional lighting and restrained teal/violet atmospheric lights.
-- Spectral centroid mapped to a teal-to-violet lighting balance.
-- Onset strength mapped to a short-lived accent-light pulse near the current generation front.
-- Seeded drifting valley mist rendered as a lightweight point cloud.
-- A restrained star field and emissive teal/violet mineral spires placed on elevated terrain.
-- A reflective, emissive water surface and fine luminous rim in the generated lowland basin.
-- Terrain vertex colours now shift subtly between teal and violet with spectral centroid; updates are smoothed and throttled.
-- Elevation defines three continuous biome regions: luminous mire in lowlands, echo forest across middle elevations and crystal highlands on peaks. Live spectral brightness shifts their shared accent palette, while signal energy increases the luminous response.
-- Environmental flora now has biome-specific forms: glowing reed-like plants in the mire, mushroom-like caps in the echo forest and angular crystal growths on elevated ridges. Seeded placement is tested against the biome elevation weights.
-- Each flora species now has its own ambient pulse frequency. Live signal energy brightens growth, while onset accents create a stronger temporary glow; subtle scale breathing continues when microphone input is paused.
-- Floating rock formations gain a spectral emissive tint and brighten with energy/onsets. Cloud clusters shift between cool violet tones, become more visible with energy and drift around fixed seeded anchor positions without cumulative positional drift.
-- Orbit exploration supports pan and zoom, with a one-click camera reset.
-- Versioned IndexedDB world storage records terrain dimensions, seed, heightfield, generation front and bounded acoustic sculpt history.
-- Local world gallery supports save, visual terrain-profile previews, rename, delete, load, portable world-file export/import and deterministic replay of the recorded feature stream; no microphone audio samples are stored.
-- Environmental motion continues independently of microphone input; terrain geometry is not changed by these ambient effects. Transient sound-wave rings appear around the active generation point and respond to pitch, energy, spectral brightness and onset accents.
-- Dark application interface to match the in-world visual direction.
-- Unit tests for core mapping, terrain behaviour and bounded atmospheric controls.
+### Audio and terrain
+- Microphone permission is requested only after the user selects **Begin listening**.
+- Audio is analysed locally into RMS energy, confidence-gated autocorrelation pitch, spectral centroid and onset strength.
+- Pitch estimation uses 2x decimation to reduce autocorrelation work while retaining the supported 65–1000 Hz band.
+- Acoustic features sculpt a deterministic seeded heightfield at a bounded generation front.
+- Silence and paused input preserve the existing terrain.
+- The feature stream is bounded to 20,000 sculpt samples; no raw audio is persisted.
 
-- M4.6 renders three expanding spatial wavefronts at the active generation point. Onset strength reveals each ripple, spectral brightness shifts it from teal to violet, signal energy expands its reach, and stable pitch changes propagation speed and spread. The effect is transient and does not modify terrain or saved-world data.
-- M4.7 adds a bounded, fixed-size field of drifting sound motes around the active generation point. Pitch changes their orbital drift, energy and onsets expand and brighten the field, and spectral brightness controls its teal/violet tint.
-- M4.8 classifies recent feature windows into ambient, sustained, accent and rhythmic patterns using only energy and a bounded history of onset timestamps. Sustained tones change cloud drift and mote movement, sharp accents briefly scale floating rocks, and stable rhythmic pulses animate flora, water and rock rotation. No raw audio is stored.
-- M4.9 reconstructs spatial sound landmarks from the already-saved sculpt history: low tones leave teal columns, high tones violet crystals, and sharp accents golden rings. Landmark positions follow the deterministic generation front and sample the final terrain heightfield. Landmarks are regenerated on load/replay, cleared on reset, and capped at 80; the persistence format is unchanged.
-- M5.1 reduces per-frame and terrain-colour allocations by reusing Three.js colour objects, batches sound landmarks into at most three instanced meshes, limits terrain palette refresh to 120 ms intervals, caps renderer pixel ratio at 1.25, and pauses the animation loop while the document is hidden. Browser/device performance profiling remains outstanding.
-- M5.2 adds a live sound-pattern label, a generation-front progress bar, zoom-in/zoom-out/reset camera controls, and microphone-startup feedback. Sound-pattern state is exposed by WorldScene and reflected in the React interface. CI passed at commit a9c5ef0.
-- M5.3 adds terrain ray-picking with a selected-location marker, biome/elevation field notes, nearby acoustic landmark identification, and a clickable 25×25 biome minimap that focuses the camera. CI passed at commit a0c797d.
-- M5.4 derives named landmarks from terrain extrema, forest-rich regions and distinct acoustic traces; adds animated 3D landmark markers, minimap discovery markers and a field journal.
-- M5.5 stores discovered landmark IDs in each saved world and portable export/import file, restores them on load and replay, and calculates per-world exploration completion for gallery cards. Older saved-world files without discovery data remain compatible.
-- M5.6 introduces biome-aware world phenomena: strong accents can trigger meteor-shower markers, sustained high pitches in highlands can trigger aurora markers, rhythmic forest patterns can trigger echo blooms, and rhythmic mire patterns can trigger mire lights. Events are derived from acoustic features only (no audio samples), rendered as persistent world markers, shown in an event journal, and saved/restored with the world. The journal is bounded to the latest 100 events; browser visual validation remains outstanding.
+### Environments and sound response
+- Three continuous elevation biomes: mire, echo forest and crystal highlands.
+- Each biome has distinct procedural flora and emissive behaviour.
+- Floating rocks, clouds, mist, stars, ridge crystals and basin water are seeded from world identity.
+- Spectral brightness, energy, pitch, accents and rhythmic patterns influence lighting, colour, wavefronts, motes and ambient motion.
+- Sound traces are reconstructed from feature history and capped at 80.
+- World phenomena include meteor showers, highland auroras, echo blooms and mire lights. Up to 100 events are stored per world.
 
-## M2 visual and behaviour decisions
+### Exploration and world memory
+- A clickable and keyboard-operable 25×25 biome minimap supports region inspection.
+- Terrain inspection reports biome, elevation, coordinates and nearby sound traces.
+- Named landmarks can be discovered in the 3D scene or minimap and tracked in a field journal.
+- Saved worlds retain discovered landmark IDs and world-event history.
+- The gallery displays terrain previews, seed, sculpt sample count, exploration completion, phenomena count and discovered biome count.
+- Save, load, rename, delete, replay, export and import are implemented.
+- Import and local-load validation bounds dimensions, heightfield values, acoustic history, discovery IDs and event metadata. Older saved worlds without optional discovery/event fields remain compatible.
+- Persistence is local to the current browser profile/device. Export is the portable transfer mechanism; cloud sync is not implemented.
 
-See M2_DESIGN.md for the full design and acceptance criteria.
+## Recent stabilization work
 
-- Terrain direction: hybrid natural landforms with restrained surreal details.
-- Atmosphere: dark, cinematic palette with selective teal, violet and moonlit accents.
-- Behaviour: terrain evolves during live sound input and remains intact when input pauses; subtle ambient motion may continue independently.
-- Persistence boundary: M3 now includes browser-local save/load, gallery management and deterministic feature replay; real-browser validation remains pending.
+- Fixed terrain-space Z orientation for flora placement, ridge crystals and basin water so generated environment objects align with the rendered heightfield.
+- Rebuilds seed-dependent environment objects, water, mist and stars when a different saved world is loaded.
+- Keeps event markers anchored to the evolving terrain surface and allows event selection in the 3D scene and event journal.
+- Fixed event-marker disposal so refreshing landmark markers no longer disposes the event journal's geometry.
+- Added complete cleanup for Three.js geometry/material resources and a ResizeObserver for responsive viewport sizing.
+- Reset acoustic-pattern state between worlds.
+- Hardened microphone startup cancellation, including permission prompts that resolve after a reset or component unmount.
+- Added keyboard arrow navigation to the minimap and visible keyboard focus styles.
+- Added Playwright checks for rendering, camera controls, minimap navigation, microphone permission failure/success, mobile overflow, and world save/export/import/load/rename/delete.
 
-## Verification status
+## Verification
 
-GitHub Actions passed unit tests and the production build for M4.6 at commit e05f6e1, M4.7 sound-mote changes at commit b765a09, M5.1 at commit e8d219a, and M5.2 at commit a9c5ef0, and M5.3 at commit a0c797d, and M5.4 at commit bc7c475. M5.5 per-world exploration persistence passed CI at commit f18e12d. M5.6 sound-driven world events are committed and awaiting CI. Browser microphone/rendering checks, IndexedDB save/reload validation and target-device profiling remain outstanding.
+- GitHub Actions previously passed the M5.6 unit-test and production-build checks at commit 7077ba3.
+- The expanded Playwright workflow now runs unit tests, a production build, and desktop/mobile Chromium browser checks with software WebGL and a fake microphone.
+- The first expanded CI run for the current branch is pending. Do not treat browser validation as complete until that run passes.
+- Physical-device microphone quality, real GPU profiling and browser-specific WebGL behaviour remain outside automated CI.
 
-## Known limitations
+## Known limitations and next validation targets
 
 - Pitch estimation is a lightweight autocorrelation starter, not a validated production pitch tracker.
-- Rhythm is not yet robustly estimated; onset strength is only a simple frame-to-frame energy change.
-- The first renderer updates a single heightfield mesh; large worlds need chunking and profiling.
-- Undo is not implemented yet; IndexedDB save/load, gallery management, validated portable JSON export/import and deterministic feature replay are implemented but need browser validation.
-- Atmospheric response drives lights, terrain colour and transient spatial sound-wave ripples; water and terrain materials remain procedural.
-- Mist, stars and ridge crystals are a first lightweight environmental pass; density, visibility and performance still need browser review.
-- No AI/ML model is required or included in this first version.
-
-## Next steps
-
-1. Confirm CI for M4.8 sound-pattern classification and environmental responses.
-2. Validate save → reload → restore in a real browser, including malformed or unavailable storage.
-3. Inspect biome transitions, water placement, reflections, camera framing and visual balance.
-4. Plan export/import and undo after the versioned world format is validated.
+- Rhythm detection is heuristic onset-interval classification, not a dedicated beat tracker.
+- The world uses a single heightfield mesh; larger worlds need chunking or a clipmap.
+- Undo/redo, cloud sync, collaborative worlds and WebGL context-loss recovery are not implemented.
+- Test on at least one physical iOS device and one lower-powered Android device before a public release.
