@@ -43,7 +43,7 @@ export function WorldMap({ terrain, revision, selected, onSelect }: Props) {
       <div><div className="eyebrow">WORLD NAVIGATION</div><p>SELECT A REGION TO EXPLORE</p></div>
       <span>25 × 25</span>
     </div>
-    <svg className="world-map" viewBox="0 0 100 100" role="img" aria-label="Clickable biome map. Teal is mire, green is forest, violet is highlands." onClick={event => {
+    <svg className="world-map" viewBox="0 0 100 100" role="button" tabIndex={0} aria-label="World map. Select a region to inspect its biome and elevation." onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSelect(0, 0) } }} onClick={event => {
       const rect = event.currentTarget.getBoundingClientRect()
       const px = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width))
       const pz = Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height))
