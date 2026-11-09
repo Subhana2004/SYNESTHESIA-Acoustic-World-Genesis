@@ -10,7 +10,7 @@ Last updated: 2026-11-10
 | M1 — Audio foundation | In progress | Browser microphone capture and initial feature extraction scaffolded; automated verification still needs confirmation |
 | M2 — Acoustic terrain genesis | Initial implementation in progress | Hybrid landforms, dark renderer palette, sound-reactive teal/violet lighting and onset accents committed |
 | M3 — Persistence and replay | Initial implementation in progress | IndexedDB save/load, visual world gallery, rename/delete, portable JSON export/import and deterministic feature-stream replay committed; browser validation pending |
-| M4 — Environment construction | Initial implementation in progress | Seeded flora, floating rocks and drifting clouds; elevation-based mire, forest and crystal-highland biomes now blend smoothly, with spectral centroid shifting the palette and input energy controlling luminous intensity |
+| M4 — Environment construction | Initial implementation in progress | Seeded mire reeds, echo-forest mushrooms and crystal-highland growths are placed by elevation; spectral centroid shifts the biome palette and input energy controls luminous intensity |
 | M5 — Visual and interaction refinement | Not started | Accessibility, responsive controls and performance profiling remain outstanding |
 | M6 — Integration and validation | Not started | Full browser/device validation remains outstanding |
 
@@ -30,6 +30,7 @@ The current branch contains a first end-to-end prototype and the first M2 visual
 - A reflective, emissive water surface and fine luminous rim in the generated lowland basin.
 - Terrain vertex colours now shift subtly between teal and violet with spectral centroid; updates are smoothed and throttled.
 - Elevation defines three continuous biome regions: luminous mire in lowlands, echo forest across middle elevations and crystal highlands on peaks. Live spectral brightness shifts their shared accent palette, while signal energy increases the luminous response.
+- Environmental flora now has biome-specific forms: glowing reed-like plants in the mire, mushroom-like caps in the echo forest and angular crystal growths in the highlands. Seeded placement is tested against the biome elevation weights.
 - Orbit exploration supports pan and zoom, with a one-click camera reset.
 - Versioned IndexedDB world storage records terrain dimensions, seed, heightfield, generation front and bounded acoustic sculpt history.
 - Local world gallery supports save, visual terrain-profile previews, rename, delete, load, portable world-file export/import and deterministic replay of the recorded feature stream; no microphone audio samples are stored.
