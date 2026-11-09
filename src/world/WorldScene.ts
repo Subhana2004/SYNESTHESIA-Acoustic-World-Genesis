@@ -253,6 +253,7 @@ export class WorldScene {
       })
       cluster.position.set(cloud.x, cloud.y, cloud.z)
       cluster.userData.phase = cloud.phase
+      cluster.userData.baseX = cloud.x
       clouds.add(cluster)
     })
     return { flora, floatingRocks, clouds }
@@ -437,10 +438,23 @@ export class WorldScene {
       })
     })
     this.floatingRocks.rotation.y = time * 0.045
+    const rockMaterial = this.floatingRocks.material as THREE.MeshStandardMaterial
+    rockMaterial.emissiveIntensity = 0.22 + this.currentBiomeEnergy * 0.55 + this.currentPulse * 0.75
+    rockMaterial.emissive.copy(new THREE.Color('#17152b').lerp(
+      new THREE.Color('#4c3e83'), this.currentPaletteBlend,
+    ))
     this.clouds.children.forEach(cluster => {
       const phase = Number(cluster.userData.phase) || 0
-      cluster.position.x += Math.sin(time * 0.7 + phase) * 0.0015
+      const baseX = Number(cluster.userData.baseX) || 0
+      cluster.position.x = baseX + Math.sin(time * 0.7 + phase) * (0.18 + this.currentBiomeEnergy * 0.32)
+      cluster.position.y += Math.sin(time * 0.35 + phase) * 0.0008
       cluster.rotation.y = Math.sin(time * 0.4 + phase) * 0.035
+      cluster.children.forEach(puff => {
+        if (!(puff instanceof THREE.Mesh)) return
+        const material = puff.material as THREE.MeshStandardMaterial
+        material.color.set('#8585ad').lerp(new THREE.Color('#8b72c8'), this.currentPaletteBlend)
+        material.opacity = 0.1 + this.currentBiomeEnergy * 0.08 + this.currentPulse * 0.045
+      })
     })
     this.targetPulse *= 0.9
     this.accentLight.intensity = this.currentPulse * 5.5
