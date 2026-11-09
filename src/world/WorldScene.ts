@@ -38,6 +38,8 @@ export class WorldScene {
   private flora: THREE.Group
   private floatingRocks: THREE.InstancedMesh
   private clouds: THREE.Group
+  private soundRipples: THREE.Mesh[] = []
+  private targetPitchTone = 0.35
 
   constructor(private host: HTMLDivElement, private terrain: TerrainState) {
     this.scene.background = new THREE.Color('#080a12')
@@ -72,6 +74,19 @@ export class WorldScene {
     this.accentLight = new THREE.PointLight('#55d6c2', 0, 18, 2)
     this.accentLight.position.set(0, 2.5, 0)
     this.scene.add(this.accentLight)
+
+    // Expanding wavefronts visualise accents at the active generation point.
+    for (let i = 0; i < 3; i++) {
+      const material = new THREE.MeshBasicMaterial({
+        color: '#55d6c2', transparent: true, opacity: 0,
+        side: THREE.DoubleSide, depthWrite: false,
+      })
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(1, 0.025, 6, 72), material)
+      ring.rotation.x = Math.PI / 2
+      ring.userData.phase = i / 3
+      this.soundRipples.push(ring)
+      this.scene.add(ring)
+    }
 
     // Lightweight point sprites provide drifting valley mist without a particle-system dependency.
     const mistCount = 260
@@ -142,6 +157,7 @@ export class WorldScene {
   updateAcousticAtmosphere(controls: AtmosphereControls, frontX: number): void {
     const blend = THREE.MathUtils.clamp(controls.spectralBlend, 0, 1)
     this.targetPaletteBlend = blend
+    this.targetPitchTone = THREE.MathUtils.clamp(controls.pitchTone, 0, 1)
     const energy = THREE.MathUtils.clamp(controls.energy, 0, 1)
     this.targetBiomeEnergy = energy
     this.targetTeal = 0.18 + (1 - blend) * 1.15 + energy * 0.35
@@ -417,6 +433,16 @@ export class WorldScene {
     this.currentPulse = THREE.MathUtils.lerp(this.currentPulse, this.targetPulse, 0.22)
     this.currentPaletteBlend = THREE.MathUtils.lerp(this.currentPaletteBlend, this.targetPaletteBlend, 0.025)
     this.currentBiomeEnergy = THREE.MathUtils.lerp(this.currentBiomeEnergy, this.targetBiomeEnergy, 0.04)
+    this.soundRipples.forEach(ring => {
+      const phase = (time * (0.42 + this.targetPitchTone * 0.48) + Number(ring.userData.phase)) % 1
+      const envelope = 1 - phase
+      const radius = 0.55 + phase * (2.2 + this.targetPitchTone * 1.5) + this.currentBiomeEnergy * 0.35
+      ring.position.set(this.targetAccentX, 0.12, this.targetAccentZ)
+      ring.scale.setScalar(radius)
+      ring.visible = this.currentPulse > 0.018
+      ;(ring.material as THREE.MeshBasicMaterial).opacity = this.currentPulse * envelope * 0.58
+      ;(ring.material as THREE.MeshBasicMaterial).color.set('#55d6c2').lerp(new THREE.Color('#a58cff'), this.currentPaletteBlend)
+    })
     if (Math.floor(performance.now() / 16) % 8 === 0) this.updateTerrainColors()
     this.water.rotation.y = Math.sin(time * 1.8) * 0.012
     this.waterMaterial.emissiveIntensity = 0.24 + Math.sin(time * 2.2) * 0.08
@@ -482,6 +508,10 @@ export class WorldScene {
     this.controls.dispose()
     this.geometry.dispose()
     this.water.geometry.dispose()
+    this.soundRipples.forEach(ring => {
+      ring.geometry.dispose()
+      ;(ring.material as THREE.Material).dispose()
+    })
     this.waterMaterial.dispose()
     this.waterRing.geometry.dispose()
     ;(this.waterRing.material as THREE.Material).dispose()
