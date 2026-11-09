@@ -21,16 +21,29 @@ describe('world discovery landmarks', () => {
 
   it('adds an acoustic landmark for a sufficiently separated sound trace', () => {
     const terrain = createTerrain()
+    const base = discoverWorldLandmarks(terrain)
+    const half = terrain.worldWidth / 2
+    const candidates = [
+      { x: -half + 3, z: -half + 3 },
+      { x: half - 3, z: -half + 3 },
+      { x: -half + 3, z: half - 3 },
+      { x: half - 3, z: half - 3 },
+    ]
+    const point = candidates.sort((a, b) =>
+      Math.min(...base.map(item => Math.hypot(item.x - b.x, item.z - b.z))) -
+      Math.min(...base.map(item => Math.hypot(item.x - a.x, item.z - a.z))),
+    )[0]
     const landmarks = discoverWorldLandmarks(terrain, [
-      { x: 0, y: 1.2, z: 18, kind: 'accent', strength: 0.95 },
+      { ...point, y: 1.2, kind: 'accent', strength: 0.95 },
     ])
     expect(landmarks.some(item => item.kind === 'echo' && item.traceKind === 'accent')).toBe(true)
   })
 
   it('does not duplicate a sound landmark close to an existing place', () => {
     const terrain = createTerrain()
+    const basin = discoverWorldLandmarks(terrain).find(item => item.kind === 'basin')!
     const landmarks = discoverWorldLandmarks(terrain, [
-      { x: 0, y: -0.5, z: 0, kind: 'low', strength: 0.8 },
+      { x: basin.x, y: basin.elevation, z: basin.z, kind: 'low', strength: 0.8 },
     ])
     expect(landmarks.filter(item => item.kind === 'echo')).toHaveLength(0)
   })
