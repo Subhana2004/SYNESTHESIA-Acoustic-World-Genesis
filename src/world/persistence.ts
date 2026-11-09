@@ -65,7 +65,7 @@ function normalizeSavedWorld(value: unknown, requireIdentity = false): SavedWorl
     !record.heights.every(height => validNumber(height) && height >= -20 && height <= 20) ||
     !Array.isArray(record.history) || record.history.length > 20000 ||
     (requireIdentity && (typeof record.id !== 'string' || !validNumber(record.savedAt)))) {
-    throw new Error('This saved world is invalid or uses an unsupported format.')
+    throw new Error('The world file is incomplete or contains invalid terrain data.')
   }
   const historyIsValid = record.history.every(item => {
     if (!item || typeof item !== 'object') return false
