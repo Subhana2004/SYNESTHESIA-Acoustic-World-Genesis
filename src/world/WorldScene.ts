@@ -193,6 +193,9 @@ export class WorldScene {
       })
       const stems = new THREE.InstancedMesh(speciesType.stemGeometry, stemMaterial, plants.length)
       const crowns = new THREE.InstancedMesh(speciesType.crownGeometry, crownMaterial, plants.length)
+      crowns.userData.biome = speciesType.biome
+      crowns.userData.pulseOffset = speciesType.biome === 'mire' ? 0 : speciesType.biome === 'forest' ? 1.7 : 3.2
+      crowns.userData.baseEmissive = 1.45
       plants.forEach((plant, index) => {
         const height = (speciesType.biome === 'forest' ? 0.48 : 0.72) * plant.scale
         transform.position.set(plant.x, plant.y + height * 0.5, plant.z)
@@ -418,6 +421,21 @@ export class WorldScene {
     this.waterMaterial.opacity = 0.68 + Math.sin(time * 1.3) * 0.035
     this.waterRing.rotation.z = Math.sin(time * 0.7) * 0.025
     this.flora.rotation.z = Math.sin(time * 1.7) * 0.006
+    this.flora.children.forEach(species => {
+      species.children.forEach(object => {
+        if (!(object instanceof THREE.InstancedMesh) || object.userData.biome === undefined) return
+        const biome = String(object.userData.biome)
+        const phase = Number(object.userData.pulseOffset) || 0
+        const frequency = biome === 'mire' ? 1.25 : biome === 'forest' ? 0.72 : 1.8
+        const pulse = (Math.sin(time * frequency * 3 + phase) + 1) * 0.5
+        const onsetBoost = this.currentPulse * (biome === 'highlands' ? 1.35 : 0.85)
+        const energyBoost = this.currentBiomeEnergy * (biome === 'forest' ? 0.75 : 1.1)
+        const material = object.material as THREE.MeshStandardMaterial
+        material.emissiveIntensity = 0.85 + pulse * 0.7 + energyBoost + onsetBoost
+        const breath = 1 + pulse * 0.025 + onsetBoost * 0.018
+        object.scale.setScalar(breath)
+      })
+    })
     this.floatingRocks.rotation.y = time * 0.045
     this.clouds.children.forEach(cluster => {
       const phase = Number(cluster.userData.phase) || 0
