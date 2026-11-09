@@ -28,6 +28,7 @@ export default function App() {
   const [listening, setListening] = useState(false)
   const [starting, setStarting] = useState(false)
   const [error, setError] = useState('')
+  const [sceneError, setSceneError] = useState('')
   const [features, setFeatures] = useState<AcousticFeatures | null>(null)
   const [updates, setUpdates] = useState(0)
   const [soundPattern, setSoundPattern] = useState<SoundPattern>('ambient')
@@ -41,10 +42,19 @@ export default function App() {
 
   useEffect(() => {
     if (!viewport.current) return
-    const instance = new WorldScene(viewport.current, terrain)
-    scene.current = instance
-    instance.updateDiscoveries(landmarks)
-    return () => { instance.dispose(); scene.current = null }
+    let instance: WorldScene | null = null
+    try {
+      instance = new WorldScene(viewport.current, terrain)
+      scene.current = instance
+      instance.updateDiscoveries(landmarks)
+    } catch (cause) {
+      instance?.dispose()
+      scene.current = null
+      setSceneError(cause instanceof Error
+        ? 'This browser could not initialise the 3D world. Try a recent browser with WebGL enabled.'
+        : 'The 3D world could not be initialised on this device.')
+    }
+    return () => { instance?.dispose(); scene.current = null }
   }, [])
 
   const stop = useCallback(() => {
@@ -191,6 +201,7 @@ export default function App() {
     <section className="world">
       <div className="world-head"><span>WORLD / 001</span><span className={listening ? 'live' : ''}><i /> {listening ? 'LISTENING' : 'WORLD AT REST'} · {soundPattern.toUpperCase()}</span></div>
       <div className="viewport" ref={viewport} role="region" aria-label="Interactive three-dimensional sound world. Drag to orbit, use the camera buttons to zoom, or select a place to inspect it." onPointerDown={event => { pointerStart.current = { x: event.clientX, y: event.clientY } }} onPointerUp={event => { const startPoint = pointerStart.current; pointerStart.current = null; if (!startPoint || Math.hypot(event.clientX - startPoint.x, event.clientY - startPoint.y) > 7) return; const landmarkId = scene.current?.pickDiscoveryAt(event.clientX, event.clientY); if (landmarkId) { discoverLandmark(landmarkId); return } const eventId = scene.current?.pickWorldEventAt(event.clientX, event.clientY); if (eventId) { const worldEvent = worldEvents.find(item => item.id === eventId); if (worldEvent) inspectLocation(worldEvent.x, worldEvent.z); return } const result = scene.current?.inspectAt(event.clientX, event.clientY); if (result) inspectLocation(result.x, result.z) }}>
+        {sceneError && <div className="scene-error" role="alert">{sceneError}</div>}
         <div className="hint">DRAG TO ORBIT · SCROLL TO EXPLORE</div>
         <div className="view-controls" aria-label="Camera controls" onPointerDown={event => event.stopPropagation()}><button className="view-reset" onClick={() => scene.current?.zoomBy(0.82)} aria-label="Zoom in">+</button><button className="view-reset" onClick={() => scene.current?.zoomBy(1.22)} aria-label="Zoom out">−</button><button className="view-reset" onClick={() => scene.current?.resetCamera()} aria-label="Reset camera view">RESET</button></div>
         <div className="coords">X {terrain.frontX.toFixed(1)} · SEED {terrain.seed}</div>
@@ -243,7 +254,7 @@ export default function App() {
         <p>{listening ? 'Change your pitch, volume, and rhythm. The terrain will keep what you create.' : 'Microphone access starts only when you choose. No speech recognition, no uploads.'}</p>
         {error && <p className="error" role="alert">{error}</p>}
         <div className="actions">
-          {!listening ? <button className="primary" onClick={start} disabled={starting}><i /> {starting ? 'Requesting microphone…' : 'Begin listening'}</button> : <button className="primary pause" onClick={stop}><i /> Pause input</button>}
+          {!listening ? <button className="primary" onClick={start} disabled={starting || Boolean(sceneError)}><i /> {starting ? 'Requesting microphone…' : 'Begin listening'}</button> : <button className="primary pause" onClick={stop}><i /> Pause input</button>}
           <button className="secondary" onClick={reset}>Reset world</button>
         </div>
       </div>
