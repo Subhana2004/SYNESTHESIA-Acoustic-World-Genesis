@@ -61,12 +61,47 @@ export async function saveWorld(snapshot: SavedWorld): Promise<void> {
   }
 }
 
-export async function listSavedWorlds(): Promise<Array<Pick<SavedWorld, 'id' | 'name' | 'savedAt' | 'seed'>>> {
+export interface SavedWorldSummary {
+  id: string
+  name: string
+  savedAt: number
+  seed: number
+  preview: number[]
+  sculptCount: number
+}
+
+export async function listSavedWorlds(): Promise<SavedWorldSummary[]> {
   const db = await openDatabase()
   try {
     const records = await requestResult<SavedWorld[]>(db.transaction(STORE, 'readonly').objectStore(STORE).getAll())
-    return records.map(({ id, name, savedAt, seed }) => ({ id, name, savedAt, seed }))
-      .sort((a, b) => b.savedAt - a.savedAt)
+    return records.map(record => {
+      const row = Math.floor(record.size / 2) * record.size
+      const stride = Math.max(1, Math.floor(record.size / 40))
+      const preview = Array.from({ length: Math.ceil(record.size / stride) }, (_, index) =>
+        record.heights[row + Math.min(record.size - 1, index * stride)] ?? 0)
+      return { id: record.id, name: record.name, savedAt: record.savedAt, seed: record.seed, preview, sculptCount: record.history.length }
+    }).sort((a, b) => b.savedAt - a.savedAt)
+  } finally {
+    db.close()
+  }
+}
+
+export async function renameWorld(id: string, name: string): Promise<void> {
+  const cleanName = name.trim().slice(0, 64)
+  if (!cleanName) throw new Error('Enter a name for this world.')
+  const db = await openDatabase()
+  try {
+    const transaction = db.transaction(STORE, 'readwrite')
+    const store = transaction.objectStore(STORE)
+    const record = await requestResult<SavedWorld | undefined>(store.get(id))
+    if (!record) throw new Error('Saved world not found.')
+    record.name = cleanName
+    await requestResult(store.put(record))
+    await new Promise<void>((resolve, reject) => {
+      transaction.oncomplete = () => resolve()
+      transaction.onerror = () => reject(transaction.error ?? new Error('Could not rename this world.'))
+      transaction.onabort = () => reject(transaction.error ?? new Error('World rename was cancelled.'))
+    })
   } finally {
     db.close()
   }
