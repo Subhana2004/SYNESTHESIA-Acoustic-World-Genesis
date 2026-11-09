@@ -16,7 +16,7 @@ Last updated: 2026-11-10
 
 ## Current implementation
 
-The current branch contains a first end-to-end prototype and the first M2 visual pass:
+The current branch contains a first end-to-end prototype with M4 environmental construction and sound-responsive visual effects:
 - User-initiated microphone access through Web Audio API.
 - RMS, confidence-gated autocorrelation pitch, spectral centroid and onset estimate.
 - Deterministic acoustic mapping.
@@ -36,11 +36,11 @@ The current branch contains a first end-to-end prototype and the first M2 visual
 - Orbit exploration supports pan and zoom, with a one-click camera reset.
 - Versioned IndexedDB world storage records terrain dimensions, seed, heightfield, generation front and bounded acoustic sculpt history.
 - Local world gallery supports save, visual terrain-profile previews, rename, delete, load, portable world-file export/import and deterministic replay of the recorded feature stream; no microphone audio samples are stored.
-- Environmental motion continues independently of microphone input; terrain geometry is not changed by these ambient effects.
+- Environmental motion continues independently of microphone input; terrain geometry is not changed by these ambient effects. Transient sound-wave rings appear around the active generation point and respond to pitch, energy, spectral brightness and onset accents.
 - Dark application interface to match the in-world visual direction.
 - Unit tests for core mapping, terrain behaviour and bounded atmospheric controls.
 
-## M2 visual and behaviour decisions
+- M4.6 renders three expanding spatial wavefronts at the active generation point. Onset strength reveals each ripple, spectral brightness shifts it from teal to violet, signal energy expands its reach, and stable pitch changes propagation speed and spread. The effect is transient and does not modify terrain or saved-world data.\n\n## M2 visual and behaviour decisions
 
 See M2_DESIGN.md for the full design and acceptance criteria.
 
@@ -51,7 +51,7 @@ See M2_DESIGN.md for the full design and acceptance criteria.
 
 ## Verification status
 
-GitHub Actions reported successful unit-test and production-build runs for the M3 persistence baseline at commit 94ca3e2. The M3.2 gallery changes have triggered new CI runs; their final result is pending. Browser microphone/rendering checks, IndexedDB save/reload validation and target-device profiling remain outstanding.
+GitHub Actions passed unit tests and the production build for the M4.3 biome-threshold correction at commit 557c321. M4.6 changes are committed and awaiting their own CI run. Browser microphone/rendering checks, IndexedDB save/reload validation and target-device profiling remain outstanding.
 
 ## Known limitations
 
@@ -59,13 +59,13 @@ GitHub Actions reported successful unit-test and production-build runs for the M
 - Rhythm is not yet robustly estimated; onset strength is only a simple frame-to-frame energy change.
 - The first renderer updates a single heightfield mesh; large worlds need chunking and profiling.
 - Undo is not implemented yet; IndexedDB save/load, gallery management, validated portable JSON export/import and deterministic feature replay are implemented but need browser validation.
-- Atmospheric response drives lights and a subtle, smoothed terrain vertex-colour shift; water and terrain materials remain procedural.
+- Atmospheric response drives lights, terrain colour and transient spatial sound-wave ripples; water and terrain materials remain procedural.
 - Mist, stars and ridge crystals are a first lightweight environmental pass; density, visibility and performance still need browser review.
 - No AI/ML model is required or included in this first version.
 
 ## Next steps
 
-1. Confirm CI for IndexedDB save/load, replay and the M2 renderer updates.
+1. Confirm CI for M4.6 pitch-driven acoustic wavefronts.
 2. Validate save → reload → restore in a real browser, including malformed or unavailable storage.
 3. Inspect biome transitions, water placement, reflections, camera framing and visual balance.
 4. Plan export/import and undo after the versioned world format is validated.
