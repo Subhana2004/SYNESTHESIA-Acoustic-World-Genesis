@@ -51,7 +51,7 @@ export default function App() {
           history.current.push({ features: { ...f }, deltaSeconds: dt })
           if (history.current.length > 20000) history.current.shift()
           scene.current?.updateTerrain()
-          scene.current?.updateSoundTraces(history.current)
+          if (history.current.length % 10 === 1) scene.current?.updateSoundTraces(history.current)
           scene.current?.updateAcousticAtmosphere(mapAtmosphere(f), terrain.frontX)
           setUpdates(v => v + 1)
         }
