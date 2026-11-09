@@ -99,6 +99,7 @@ export default function App() {
     terrain.frontX = fresh.frontX
     lastUpdate.current = 0
     scene.current?.updateTerrain()
+    scene.current?.clearInspection()
     scene.current?.updateSoundTraces([])
     scene.current?.updateAcousticAtmosphere({ spectralBlend: 0.35, onsetPulse: 0, energy: 0, pitchTone: 0.35 }, terrain.frontX)
     setUpdates(0)
@@ -152,6 +153,7 @@ export default function App() {
       </div>
       <WorldMemory terrain={terrain} history={history} stop={stop} onWorldChange={(count) => {
         scene.current?.updateTerrain()
+        scene.current?.clearInspection()
         scene.current?.updateSoundTraces(history.current)
         scene.current?.updateAcousticAtmosphere({ spectralBlend: 0.35, onsetPulse: 0, energy: 0, pitchTone: 0.35 }, terrain.frontX)
         scene.current?.resetCamera()
