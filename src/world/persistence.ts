@@ -166,3 +166,42 @@ export function restoreWorld(terrain: TerrainState, saved: SavedWorld): void {
   terrain.frontX = saved.frontX
   terrain.seed = saved.seed
 }
+
+export function parseWorldFile(value: unknown): SavedWorld {
+  if (!value || typeof value !== 'object') throw new Error('This file is not a SYNESTHESIA world.')
+  const envelope = value as { format?: unknown; formatVersion?: unknown; world?: unknown }
+  if (envelope.format !== 'SYNESTHESIA_WORLD' || envelope.formatVersion !== 1 ||
+    !envelope.world || typeof envelope.world !== 'object') {
+    throw new Error('Unsupported world file. Choose a SYNESTHESIA world export.')
+  }
+  const record = envelope.world as Partial<SavedWorld>
+  const validNumber = (item: unknown): item is number => typeof item === 'number' && Number.isFinite(item)
+  if (record.version !== 1 || typeof record.name !== 'string' ||
+    !validNumber(record.size) || record.size < 2 || record.size > 512 ||
+    !validNumber(record.worldWidth) || record.worldWidth <= 0 ||
+    !validNumber(record.seed) || !validNumber(record.frontX) ||
+    !Array.isArray(record.heights) || record.heights.length !== record.size * record.size ||
+    !record.heights.every(height => validNumber(height) && height >= -20 && height <= 20) ||
+    !Array.isArray(record.history) || record.history.length > 20000) {
+    throw new Error('The world file is incomplete or contains invalid terrain data.')
+  }
+  const historyIsValid = record.history.every(item => {
+    if (!item || typeof item !== 'object') return false
+    const event = item as RecordedSculpt
+    const f = event.features
+    return validNumber(event.deltaSeconds) && event.deltaSeconds >= 0 && event.deltaSeconds <= 10 &&
+      !!f && validNumber(f.timestamp) && validNumber(f.rms) && f.rms >= 0 &&
+      (f.pitchHz === null || validNumber(f.pitchHz)) && validNumber(f.pitchConfidence) &&
+      validNumber(f.spectralCentroidHz) && validNumber(f.onsetStrength) && typeof f.isSilent === 'boolean'
+  })
+  if (!historyIsValid) throw new Error('The world file contains invalid acoustic history.')
+  return {
+    ...record,
+    id: globalThis.crypto?.randomUUID?.() ?? `world-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    name: record.name.trim().slice(0, 64) || 'Imported world',
+    savedAt: Date.now(),
+    version: 1,
+    heights: [...record.heights],
+    history: record.history.map(item => ({ features: { ...item.features }, deltaSeconds: item.deltaSeconds })),
+  } as SavedWorld
+}
