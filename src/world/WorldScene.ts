@@ -32,6 +32,8 @@ export class WorldScene {
   private waterMaterial: THREE.MeshStandardMaterial
   private targetPaletteBlend = 0.35
   private currentPaletteBlend = 0.35
+  private targetBiomeEnergy = 0
+  private currentBiomeEnergy = 0
   private flora: THREE.Group
   private floatingRocks: THREE.InstancedMesh
   private clouds: THREE.Group
@@ -140,6 +142,7 @@ export class WorldScene {
     const blend = THREE.MathUtils.clamp(controls.spectralBlend, 0, 1)
     this.targetPaletteBlend = blend
     const energy = THREE.MathUtils.clamp(controls.energy, 0, 1)
+    this.targetBiomeEnergy = energy
     this.targetTeal = 0.18 + (1 - blend) * 1.15 + energy * 0.35
     this.targetViolet = 0.18 + blend * 1.2 + energy * 0.25
     this.targetPulse = Math.max(this.targetPulse, THREE.MathUtils.clamp(controls.onsetPulse, 0, 1))
@@ -312,17 +315,25 @@ export class WorldScene {
   }
 
   private terrainColor(height: number): THREE.Color {
-    const deep = new THREE.Color('#171a2a')
-    const slope = new THREE.Color('#343a56')
-    const high = new THREE.Color('#65708e')
-    const crest = new THREE.Color('#a3a9c7')
-    let base: THREE.Color
-    if (height < 0.15) base = deep.lerp(slope, THREE.MathUtils.smoothstep(height, -0.8, 0.15))
-    else if (height < 1.15) base = slope.lerp(high, THREE.MathUtils.smoothstep(height, 0.15, 1.15))
-    else base = high.lerp(crest, THREE.MathUtils.smoothstep(height, 1.15, 3.2))
-    const tealTint = new THREE.Color('#246f70')
-    const violetTint = new THREE.Color('#704e9e')
-    return base.lerp(tealTint.lerp(violetTint, this.currentPaletteBlend), 0.16)
+    const lowland = 1 - THREE.MathUtils.smoothstep(height, -0.05, 0.55)
+    const highland = THREE.MathUtils.smoothstep(height, 0.8, 1.85)
+    const woodland = Math.max(0, 1 - lowland - highland)
+    const total = Math.max(0.0001, lowland + woodland + highland)
+    const weights = [lowland / total, woodland / total, highland / total]
+
+    // Each elevation band has its own identity; the live spectrum shifts the
+    // shared accent from glacial teal toward dreamlike violet.
+    const palettes = [
+      new THREE.Color('#174b55'), // luminous mire
+      new THREE.Color('#285b50'), // echo forest
+      new THREE.Color('#51446f'), // crystal highlands
+    ]
+    const base = palettes[0].clone().multiplyScalar(weights[0])
+      .add(palettes[1].clone().multiplyScalar(weights[1]))
+      .add(palettes[2].clone().multiplyScalar(weights[2]))
+    const spectralAccent = new THREE.Color('#287e83').lerp(new THREE.Color('#9870c7'), this.currentPaletteBlend)
+    const energyAccent = new THREE.Color('#172536').lerp(spectralAccent, 0.12 + this.currentBiomeEnergy * 0.3)
+    return base.lerp(energyAccent, 0.22 + this.currentBiomeEnergy * 0.12)
   }
 
   private vertexColors(): number[] {
@@ -375,6 +386,7 @@ export class WorldScene {
     this.violetLight.intensity = THREE.MathUtils.lerp(this.violetLight.intensity, this.targetViolet, 0.035)
     this.currentPulse = THREE.MathUtils.lerp(this.currentPulse, this.targetPulse, 0.22)
     this.currentPaletteBlend = THREE.MathUtils.lerp(this.currentPaletteBlend, this.targetPaletteBlend, 0.025)
+    this.currentBiomeEnergy = THREE.MathUtils.lerp(this.currentBiomeEnergy, this.targetBiomeEnergy, 0.04)
     if (Math.floor(performance.now() / 16) % 8 === 0) this.updateTerrainColors()
     this.water.rotation.y = Math.sin(time * 1.8) * 0.012
     this.waterMaterial.emissiveIntensity = 0.24 + Math.sin(time * 2.2) * 0.08
