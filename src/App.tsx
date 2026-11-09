@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { AudioEngine } from './audio/AudioEngine'
 import { mapAtmosphere, type AcousticFeatures } from './audio/features'
 import { createTerrain, sculptTerrain } from './world/terrain'
-import { WorldScene } from './world/WorldScene'
+import type { WorldScene } from './world/WorldScene'
 import { WorldMemory } from './world/WorldMemory'
 import type { RecordedSculpt } from './world/persistence'
 import type { SoundPattern } from './world/soundPatterns'
@@ -29,6 +29,7 @@ export default function App() {
   const [starting, setStarting] = useState(false)
   const [error, setError] = useState('')
   const [sceneError, setSceneError] = useState('')
+  const [sceneLoading, setSceneLoading] = useState(true)
   const [features, setFeatures] = useState<AcousticFeatures | null>(null)
   const [updates, setUpdates] = useState(0)
   const [soundPattern, setSoundPattern] = useState<SoundPattern>('ambient')
@@ -41,20 +42,30 @@ export default function App() {
   const generationProgress = Math.min(100, Math.max(0, ((terrain.frontX + terrain.worldWidth * 0.42) / (terrain.worldWidth * 0.84)) * 100))
 
   useEffect(() => {
-    if (!viewport.current) return
+    let active = true
     let instance: WorldScene | null = null
-    try {
-      instance = new WorldScene(viewport.current, terrain)
-      scene.current = instance
-      instance.updateDiscoveries(landmarks)
-    } catch (cause) {
-      instance?.dispose()
-      scene.current = null
-      setSceneError(cause instanceof Error
-        ? 'This browser could not initialise the 3D world. Try a recent browser with WebGL enabled.'
-        : 'The 3D world could not be initialised on this device.')
+    const initialiseScene = async () => {
+      try {
+        const { WorldScene: Scene } = await import('./world/WorldScene')
+        if (!active || !viewport.current) return
+        instance = new Scene(viewport.current, terrain)
+        scene.current = instance
+        instance.updateDiscoveries(landmarks)
+      } catch {
+        if (active) {
+          scene.current = null
+          setSceneError('This browser could not initialise the 3D world. Try a recent browser with WebGL enabled.')
+        }
+      } finally {
+        if (active) setSceneLoading(false)
+      }
     }
-    return () => { instance?.dispose(); scene.current = null }
+    void initialiseScene()
+    return () => {
+      active = false
+      instance?.dispose()
+      if (scene.current === instance) scene.current = null
+    }
   }, [])
 
   const stop = useCallback(() => {
@@ -201,6 +212,7 @@ export default function App() {
     <section className="world">
       <div className="world-head"><span>WORLD / 001</span><span className={listening ? 'live' : ''}><i /> {listening ? 'LISTENING' : 'WORLD AT REST'} · {soundPattern.toUpperCase()}</span></div>
       <div className="viewport" ref={viewport} role="region" aria-label="Interactive three-dimensional sound world. Drag to orbit, use the camera buttons to zoom, or select a place to inspect it." onPointerDown={event => { pointerStart.current = { x: event.clientX, y: event.clientY } }} onPointerUp={event => { const startPoint = pointerStart.current; pointerStart.current = null; if (!startPoint || Math.hypot(event.clientX - startPoint.x, event.clientY - startPoint.y) > 7) return; const landmarkId = scene.current?.pickDiscoveryAt(event.clientX, event.clientY); if (landmarkId) { discoverLandmark(landmarkId); return } const eventId = scene.current?.pickWorldEventAt(event.clientX, event.clientY); if (eventId) { const worldEvent = worldEvents.find(item => item.id === eventId); if (worldEvent) inspectLocation(worldEvent.x, worldEvent.z); return } const result = scene.current?.inspectAt(event.clientX, event.clientY); if (result) inspectLocation(result.x, result.z) }}>
+        {sceneLoading && <div className="scene-loading" role="status">Preparing your world…</div>}
         {sceneError && <div className="scene-error" role="alert">{sceneError}</div>}
         <div className="hint">DRAG TO ORBIT · SCROLL TO EXPLORE</div>
         <div className="view-controls" aria-label="Camera controls" onPointerDown={event => event.stopPropagation()}><button className="view-reset" onClick={() => scene.current?.zoomBy(0.82)} aria-label="Zoom in">+</button><button className="view-reset" onClick={() => scene.current?.zoomBy(1.22)} aria-label="Zoom out">−</button><button className="view-reset" onClick={() => scene.current?.resetCamera()} aria-label="Reset camera view">RESET</button></div>
@@ -254,7 +266,7 @@ export default function App() {
         <p>{listening ? 'Change your pitch, volume, and rhythm. The terrain will keep what you create.' : 'Microphone access starts only when you choose. No speech recognition, no uploads.'}</p>
         {error && <p className="error" role="alert">{error}</p>}
         <div className="actions">
-          {!listening ? <button className="primary" onClick={start} disabled={starting || Boolean(sceneError)}><i /> {starting ? 'Requesting microphone…' : 'Begin listening'}</button> : <button className="primary pause" onClick={stop}><i /> Pause input</button>}
+          {!listening ? <button className="primary" onClick={start} disabled={starting || sceneLoading || Boolean(sceneError)}><i /> {starting ? 'Requesting microphone…' : 'Begin listening'}</button> : <button className="primary pause" onClick={stop}><i /> Pause input</button>}
           <button className="secondary" onClick={reset}>Reset world</button>
         </div>
       </div>
