@@ -11,6 +11,7 @@ import { WorldMap } from './world/WorldMap'
 import type { TerrainInspection } from './world/WorldScene'
 import { discoverWorldLandmarks, type WorldLandmark } from './world/discovery'
 import { createWorldEvent, type WorldEvent } from './world/worldEvents'
+import { getBiomeWeights } from './world/biomes'
 
 const terrain = createTerrain()
 
@@ -25,6 +26,7 @@ export default function App() {
   const eventSequence = useRef(0)
   const lastWorldEventAt = useRef(0)
   const pointerStart = useRef<{ x: number; y: number } | null>(null)
+  const pendingInspection = useRef<TerrainInspection | null>(null)
   const [listening, setListening] = useState(false)
   const [starting, setStarting] = useState(false)
   const [error, setError] = useState('')
@@ -51,6 +53,7 @@ export default function App() {
         instance = new Scene(viewport.current, terrain)
         scene.current = instance
         instance.updateDiscoveries(landmarks)
+        if (pendingInspection.current) instance.inspectWorldPoint(pendingInspection.current.x, pendingInspection.current.z)
       } catch {
         if (active) {
           scene.current = null
@@ -138,8 +141,18 @@ export default function App() {
   }
 
   const inspectLocation = (x: number, z: number) => {
-    const result = scene.current?.inspectWorldPoint(x, z)
-    if (!result) return
+    const half = terrain.worldWidth / 2
+    const worldX = Math.max(-half, Math.min(half, x))
+    const worldZ = Math.max(-half, Math.min(half, z))
+    const step = terrain.worldWidth / (terrain.size - 1)
+    const col = Math.max(0, Math.min(terrain.size - 1, Math.round((worldX + half) / step)))
+    const row = Math.max(0, Math.min(terrain.size - 1, Math.round((worldZ + half) / step)))
+    const elevation = terrain.heights[row * terrain.size + col]
+    const weights = getBiomeWeights(elevation)
+    const biome = weights.highlands >= weights.forest && weights.highlands >= weights.mire
+      ? 'highlands' : weights.forest >= weights.mire ? 'forest' : 'mire'
+    const result = scene.current?.inspectWorldPoint(worldX, worldZ) ?? { x: worldX, z: worldZ, elevation, biome }
+    pendingInspection.current = result
     setInspection(result)
     const traces = deriveSoundTraces(terrain, history.current)
     const nearest = traces.reduce<{ trace: SoundTrace; distance: number } | null>((best, trace) => {
@@ -181,6 +194,7 @@ export default function App() {
     setFeatures(null)
     setSoundPattern('ambient')
     setInspection(null)
+    pendingInspection.current = null
     setNearbyTrace(null)
     setDiscoveredIds([])
     eventHistory.current = []
