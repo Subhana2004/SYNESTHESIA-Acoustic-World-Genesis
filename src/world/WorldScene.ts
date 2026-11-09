@@ -685,6 +685,11 @@ export class WorldScene {
         object.scale.setScalar(breath)
       })
     })
+    this.discoveryGroup.children.forEach((object, index) => {
+      if (!(object instanceof THREE.Mesh)) return
+      object.rotation.y = time * (0.42 + index * 0.08)
+      object.position.y = Number(object.userData.baseY) + Math.sin(time * 1.8 + index) * 0.12
+    })
     this.floatingRocks.rotation.y = time * (0.045 + this.rhythmStrength * 0.055)
     this.floatingRocks.scale.setScalar(1 + (this.soundPattern === 'accent' ? this.currentPulse * 0.045 : 0))
     const rockMaterial = this.floatingRocks.material as THREE.MeshStandardMaterial
