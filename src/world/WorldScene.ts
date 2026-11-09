@@ -134,7 +134,7 @@ export class WorldScene {
         const height = this.terrain.heights[index]
         if (height < 1.05) continue
         const x = (col / (this.terrain.size - 1) - 0.5) * this.terrain.worldWidth
-        const z = (row / (this.terrain.size - 1) - 0.5) * this.terrain.worldWidth
+        const z = (0.5 - row / (this.terrain.size - 1)) * this.terrain.worldWidth
         candidates.push({ x, z, y: height })
       }
     }
