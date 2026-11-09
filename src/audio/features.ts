@@ -41,24 +41,28 @@ export function mapAtmosphere(f: AcousticFeatures): AtmosphereControls {
 }
 
 export function estimatePitch(samples: Float32Array, sampleRate: number): { pitchHz: number | null; confidence: number } {
-  const n = samples.length
+  // A 2x decimation keeps the 65–1000 Hz pitch band intact while reducing
+  // the quadratic autocorrelation work by roughly four times.
+  const stride = 2
+  const n = Math.floor(samples.length / stride)
   if (n < 32) return { pitchHz: null, confidence: 0 }
+  const effectiveRate = sampleRate / stride
   let mean = 0
-  for (let i = 0; i < n; i++) mean += samples[i]
+  for (let i = 0; i < n; i++) mean += samples[i * stride]
   mean /= n
   let energy = 0
-  for (let i = 0; i < n; i++) energy += (samples[i] - mean) ** 2
+  for (let i = 0; i < n; i++) energy += (samples[i * stride] - mean) ** 2
   if (energy / n < 0.00002) return { pitchHz: null, confidence: 0 }
 
-  const minLag = Math.max(2, Math.floor(sampleRate / 1000))
-  const maxLag = Math.min(Math.floor(sampleRate / 65), Math.floor(n / 2))
+  const minLag = Math.max(2, Math.floor(effectiveRate / 1000))
+  const maxLag = Math.min(Math.floor(effectiveRate / 65), Math.floor(n / 2))
   let bestLag = -1
   let best = 0
   for (let lag = minLag; lag <= maxLag; lag++) {
     let cross = 0, left = 0, right = 0
     for (let i = 0; i < n - lag; i++) {
-      const a = samples[i] - mean
-      const b = samples[i + lag] - mean
+      const a = samples[i * stride] - mean
+      const b = samples[(i + lag) * stride] - mean
       cross += a * b
       left += a * a
       right += b * b
@@ -68,7 +72,7 @@ export function estimatePitch(samples: Float32Array, sampleRate: number): { pitc
     if (corr > best) { best = corr; bestLag = lag }
   }
   if (bestLag < 0 || best < 0.72) return { pitchHz: null, confidence: clamp(best, 0, 1) }
-  return { pitchHz: sampleRate / bestLag, confidence: clamp(best, 0, 1) }
+  return { pitchHz: effectiveRate / bestLag, confidence: clamp(best, 0, 1) }
 }
 
 export function extractFeatures(time: Float32Array, spectrum: Uint8Array, sampleRate: number, previousRms = 0, timestamp = performance.now()): AcousticFeatures {
