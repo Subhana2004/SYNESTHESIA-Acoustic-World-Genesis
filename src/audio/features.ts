@@ -58,6 +58,7 @@ export function estimatePitch(samples: Float32Array, sampleRate: number): { pitc
   const maxLag = Math.min(Math.floor(effectiveRate / 65), Math.floor(n / 2))
   let bestLag = -1
   let best = 0
+  const correlations = new Float32Array(maxLag + 1)
   for (let lag = minLag; lag <= maxLag; lag++) {
     let cross = 0, left = 0, right = 0
     for (let i = 0; i < n - lag; i++) {
@@ -69,10 +70,21 @@ export function estimatePitch(samples: Float32Array, sampleRate: number): { pitc
     }
     const denom = Math.sqrt(left * right)
     const corr = denom > 0 ? cross / denom : 0
-    if (corr > best) { best = corr; bestLag = lag }
+    correlations[lag] = corr
+    if (corr > best) best = corr
+  }
+  const threshold = Math.max(0.72, best * 0.97)
+  for (let lag = minLag; lag <= maxLag; lag++) {
+    const current = correlations[lag]
+    const previous = lag > minLag ? correlations[lag - 1] : -Infinity
+    const next = lag < maxLag ? correlations[lag + 1] : -Infinity
+    if (current >= threshold && current >= previous && current >= next) {
+      bestLag = lag
+      break
+    }
   }
   if (bestLag < 0 || best < 0.72) return { pitchHz: null, confidence: clamp(best, 0, 1) }
-  return { pitchHz: effectiveRate / bestLag, confidence: clamp(best, 0, 1) }
+  return { pitchHz: effectiveRate / bestLag, confidence: clamp(correlations[bestLag], 0, 1) }
 }
 
 export function extractFeatures(time: Float32Array, spectrum: Uint8Array, sampleRate: number, previousRms = 0, timestamp = performance.now()): AcousticFeatures {
