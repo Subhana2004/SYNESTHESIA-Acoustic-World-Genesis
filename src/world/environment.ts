@@ -74,7 +74,7 @@ export function generateEnvironmentLayout(terrain: TerrainState): EnvironmentLay
   for (let i = 0; i < 9; i++) {
     const x = (random() * 2 - 1) * half * 0.82
     const z = (random() * 2 - 1) * half * 0.82
-    const ground = sampleHeight(terrain, x, z)
+    const ground = sampleTerrainHeight(terrain, x, z)
     floatingRocks.push({
       x,
       y: Math.max(ground + 4.2, 4.8 + random() * 4.8),
