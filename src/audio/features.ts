@@ -19,6 +19,7 @@ export interface AtmosphereControls {
   spectralBlend: number
   onsetPulse: number
   energy: number
+  pitchTone: number
 }
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v))
@@ -33,6 +34,9 @@ export function mapAtmosphere(f: AcousticFeatures): AtmosphereControls {
     spectralBlend,
     onsetPulse: f.isSilent ? 0 : clamp(f.onsetStrength, 0, 1),
     energy: f.isSilent ? 0 : clamp((f.rms - 0.012) / 0.22, 0, 1),
+    pitchTone: f.isSilent || f.pitchHz === null || f.pitchConfidence < 0.72
+      ? 0.35
+      : clamp(Math.log2(f.pitchHz / 65) / Math.log2(1000 / 65), 0, 1),
   }
 }
 
