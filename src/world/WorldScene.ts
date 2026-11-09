@@ -254,6 +254,7 @@ export class WorldScene {
       cluster.position.set(cloud.x, cloud.y, cloud.z)
       cluster.userData.phase = cloud.phase
       cluster.userData.baseX = cloud.x
+      cluster.userData.baseY = cloud.y
       clouds.add(cluster)
     })
     return { flora, floatingRocks, clouds }
@@ -447,7 +448,7 @@ export class WorldScene {
       const phase = Number(cluster.userData.phase) || 0
       const baseX = Number(cluster.userData.baseX) || 0
       cluster.position.x = baseX + Math.sin(time * 0.7 + phase) * (0.18 + this.currentBiomeEnergy * 0.32)
-      cluster.position.y += Math.sin(time * 0.35 + phase) * 0.0008
+      cluster.position.y = (Number(cluster.userData.baseY) || 0) + Math.sin(time * 0.35 + phase) * 0.08
       cluster.rotation.y = Math.sin(time * 0.4 + phase) * 0.035
       cluster.children.forEach(puff => {
         if (!(puff instanceof THREE.Mesh)) return
