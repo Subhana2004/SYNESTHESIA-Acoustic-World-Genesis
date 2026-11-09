@@ -56,11 +56,11 @@ export function WorldMemory({ terrain, history, discoveredIds, events, stop, onW
 
   const replay = () => {
     stop()
-    const events = history.current.map(item => ({ features: { ...item.features }, deltaSeconds: item.deltaSeconds }))
-    const replayed = replayTerrain(terrain.seed, terrain.size, terrain.worldWidth, events)
+    const replayHistory = history.current.map(item => ({ features: { ...item.features }, deltaSeconds: item.deltaSeconds }))
+    const replayed = replayTerrain(terrain.seed, terrain.size, terrain.worldWidth, replayHistory)
     terrain.heights.set(replayed.heights)
     terrain.frontX = replayed.frontX
-    onWorldChange(events.length, discoveredIds, events)
+    onWorldChange(replayHistory.length, discoveredIds, events)
     setMessage('Creation replayed from the recorded acoustic feature stream.')
   }
 
