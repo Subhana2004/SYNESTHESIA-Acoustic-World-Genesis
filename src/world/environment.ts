@@ -59,10 +59,10 @@ export function generateEnvironmentLayout(terrain: TerrainState): EnvironmentLay
   for (let attempt = 0; attempt < 1200 && flora.length < 88; attempt++) {
     const x = (random() * 2 - 1) * half * 0.94
     const z = (random() * 2 - 1) * half * 0.94
-    // Keep the reflective basin open and reserve the steepest peaks for mineral spires.
+    // Keep the reflective basin open; crystal growths are allowed on high ridges.
     if (Math.hypot(x - terrain.worldWidth * 0.06, z - terrain.worldWidth * 0.04) < 5.1) continue
     const y = sampleHeight(terrain, x, z)
-    if (y < 0.08 || y > 2.15) continue
+    if (y < 0.08 || y > 3.2) continue
     const weights = getBiomeWeights(y)
     const biome: BiomeKind = weights.mire >= weights.forest && weights.mire >= weights.highlands
       ? 'mire'
