@@ -27,6 +27,9 @@ The current branch contains a first end-to-end prototype and the first M2 visual
 - Onset strength mapped to a short-lived accent-light pulse near the current generation front.
 - Seeded drifting valley mist rendered as a lightweight point cloud.
 - A restrained star field and emissive teal/violet mineral spires placed on elevated terrain.
+- A reflective, emissive water surface and fine luminous rim in the generated lowland basin.
+- Terrain vertex colours now shift subtly between teal and violet with spectral centroid; updates are smoothed and throttled.
+- Orbit exploration supports pan and zoom, with a one-click camera reset.
 - Environmental motion continues independently of microphone input; terrain geometry is not changed by these ambient effects.
 - Dark application interface to match the in-world visual direction.
 - Unit tests for core mapping, terrain behaviour and bounded atmospheric controls.
@@ -42,7 +45,7 @@ See M2_DESIGN.md for the full design and acceptance criteria.
 
 ## Verification status
 
-GitHub Actions reported successful unit-test and production-build runs for the sound-reactive atmosphere changes (commit e300b403). The environmental mist, stars and ridge-crystal changes were committed afterward, so their own CI verification is still pending. Browser microphone/rendering checks and target-device profiling remain outstanding. Browser microphone/rendering checks and target-device profiling remain outstanding.
+GitHub Actions reported successful unit-test and production-build runs for the sound-reactive atmosphere changes (commit e300b403). The environmental mist, stars and ridge-crystal implementation passed GitHub Actions unit tests and production build. The newer basin-water, terrain palette and camera-control commits are awaiting their own CI result. Browser microphone/rendering checks and target-device profiling remain outstanding.
 
 ## Known limitations
 
@@ -50,14 +53,13 @@ GitHub Actions reported successful unit-test and production-build runs for the s
 - Rhythm is not yet robustly estimated; onset strength is only a simple frame-to-frame energy change.
 - The first renderer updates a single heightfield mesh; large worlds need chunking and profiling.
 - Save/load, import/export, undo, and replay are not implemented yet.
-- Atmospheric response currently drives lights rather than persistent terrain materials.
+- Atmospheric response drives lights and a subtle, smoothed terrain vertex-colour shift; water and terrain materials remain procedural.
 - Mist, stars and ridge crystals are a first lightweight environmental pass; density, visibility and performance still need browser review.
 - No AI/ML model is required or included in this first version.
 
 ## Next steps
 
-1. Confirm the M2 build and test pipeline with a successful CI run.
-2. Confirm CI for the mist, stars and ridge-crystal implementation.
-3. Inspect environmental density, camera visibility and performance in a real browser.
-4. Verify pause/silence preservation, reset determinism and ambient motion.
-5. Stabilise the world-state schema before M3 persistence and replay.
+1. Confirm CI for basin water, spectral terrain tint and camera controls.
+2. Inspect water placement, reflections, camera framing and visual balance in a real browser.
+3. Verify pause/silence preservation, reset determinism and ambient motion.
+4. Stabilise the world-state schema before M3 persistence and replay.
