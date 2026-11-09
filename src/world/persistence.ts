@@ -39,8 +39,12 @@ function openDatabase(): Promise<IDBDatabase> {
       const db = request.result
       if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE, { keyPath: 'id' })
     }
-    request.onsuccess = () => resolve(request.result)
+    request.onsuccess = () => {
+      request.result.onversionchange = () => request.result.close()
+      resolve(request.result)
+    }
     request.onerror = () => reject(request.error ?? new Error('Could not open world storage.'))
+    request.onblocked = () => reject(new Error('World storage is busy in another tab. Close other SYNESTHESIA tabs and retry.'))
   })
 }
 
@@ -109,6 +113,11 @@ export async function saveWorld(snapshot: SavedWorld): Promise<void> {
       transaction.onerror = () => reject(transaction.error ?? new Error('Could not save this world.'))
       transaction.onabort = () => reject(transaction.error ?? new Error('World save was cancelled.'))
     })
+  } catch (cause) {
+    if (cause instanceof DOMException && cause.name === 'QuotaExceededError') {
+      throw new Error('Browser storage is full. Export and delete older worlds before saving another.')
+    }
+    throw cause
   } finally {
     db.close()
   }
