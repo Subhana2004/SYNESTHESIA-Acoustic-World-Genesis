@@ -45,6 +45,7 @@ The current branch contains a first end-to-end prototype with M4 environmental c
 - M4.8 classifies recent feature windows into ambient, sustained, accent and rhythmic patterns using only energy and a bounded history of onset timestamps. Sustained tones change cloud drift and mote movement, sharp accents briefly scale floating rocks, and stable rhythmic pulses animate flora, water and rock rotation. No raw audio is stored.
 - M4.9 reconstructs spatial sound landmarks from the already-saved sculpt history: low tones leave teal columns, high tones violet crystals, and sharp accents golden rings. Landmark positions follow the deterministic generation front and sample the final terrain heightfield. Landmarks are regenerated on load/replay, cleared on reset, and capped at 80; the persistence format is unchanged.
 - M5.1 reduces per-frame and terrain-colour allocations by reusing Three.js colour objects, batches sound landmarks into at most three instanced meshes, limits terrain palette refresh to 120 ms intervals, caps renderer pixel ratio at 1.25, and pauses the animation loop while the document is hidden. Browser/device performance profiling remains outstanding.
+- M5.2 adds a live sound-pattern label, a generation-front progress bar, zoom-in/zoom-out/reset camera controls, and microphone-startup feedback. Sound-pattern state is exposed by WorldScene and reflected in the React interface. Mobile touch exploration continues to use OrbitControls; browser/device interaction testing remains outstanding.
 
 ## M2 visual and behaviour decisions
 
