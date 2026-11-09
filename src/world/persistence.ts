@@ -124,6 +124,8 @@ export interface SavedWorldSummary {
   discoveredCount: number
   landmarkCount: number
   explorationPercent: number
+  eventCount: number
+  discoveredBiomeCount: number
 }
 
 export async function listSavedWorlds(): Promise<SavedWorldSummary[]> {
@@ -144,12 +146,16 @@ export async function listSavedWorlds(): Promise<SavedWorldSummary[]> {
       const traces = deriveSoundTraces(terrain, record.history)
       const landmarks = discoverWorldLandmarks(terrain, traces)
       const discovered = new Set(Array.isArray(record.discoveredLandmarkIds) ? record.discoveredLandmarkIds : [])
-      const discoveredCount = landmarks.filter(item => discovered.has(item.id)).length
+      const discoveredLandmarks = landmarks.filter(item => discovered.has(item.id))
+      const discoveredCount = discoveredLandmarks.length
+      const discoveredBiomeCount = new Set(discoveredLandmarks.map(item => item.biome)).size
       return {
         id: record.id, name: record.name, savedAt: record.savedAt, seed: record.seed,
         preview, sculptCount: record.history.length, discoveredCount,
         landmarkCount: landmarks.length,
         explorationPercent: landmarks.length ? Math.round(discoveredCount / landmarks.length * 100) : 0,
+        eventCount: (record.events ?? []).length,
+        discoveredBiomeCount,
       }
     }).sort((a, b) => b.savedAt - a.savedAt)
   } finally {
