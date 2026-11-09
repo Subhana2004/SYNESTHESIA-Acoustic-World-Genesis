@@ -43,11 +43,11 @@ See M2_DESIGN.md for the full design and acceptance criteria.
 - Terrain direction: hybrid natural landforms with restrained surreal details.
 - Atmosphere: dark, cinematic palette with selective teal, violet and moonlit accents.
 - Behaviour: terrain evolves during live sound input and remains intact when input pauses; subtle ambient motion may continue independently.
-- Persistence boundary: durable save/load across browser sessions is M3, not yet implemented.
+- Persistence boundary: M3 now includes browser-local save/load, gallery management and deterministic feature replay; real-browser validation remains pending.
 
 ## Verification status
 
-GitHub Actions reported successful unit-test and production-build runs for the sound-reactive atmosphere changes (commit e300b403). The environmental mist, stars and ridge-crystal implementation passed GitHub Actions unit tests and production build. The newer basin-water, terrain palette and camera-control commits are awaiting their own CI result. Browser microphone/rendering checks and target-device profiling remain outstanding.
+GitHub Actions reported successful unit-test and production-build runs for the M3 persistence baseline at commit 94ca3e2. The M3.2 gallery changes have triggered new CI runs; their final result is pending. Browser microphone/rendering checks, IndexedDB save/reload validation and target-device profiling remain outstanding.
 
 ## Known limitations
 
