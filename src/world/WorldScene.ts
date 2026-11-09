@@ -447,6 +447,28 @@ export class WorldScene {
     return { surface, ring, material }
   }
 
+  private refreshSeededAtmosphere(): void {
+    let state = this.terrain.seed >>> 0
+    const random = () => {
+      state = (1664525 * state + 1013904223) >>> 0
+      return state / 4294967296
+    }
+    for (let index = 0; index < this.mistPhases.length; index++) {
+      this.mistPositions[index * 3] = (random() - 0.5) * this.terrain.worldWidth
+      this.mistPositions[index * 3 + 1] = 0.45 + random() * 2.4
+      this.mistPositions[index * 3 + 2] = (random() - 0.5) * this.terrain.worldWidth
+      this.mistPhases[index] = random() * Math.PI * 2
+    }
+    ;(this.mist.geometry.attributes.position as THREE.BufferAttribute).needsUpdate = true
+    const stars = this.stars.geometry.attributes.position as THREE.BufferAttribute
+    for (let index = 0; index < stars.count; index++) {
+      const angle = random() * Math.PI * 2
+      const radius = 48 + random() * 38
+      stars.setXYZ(index, Math.cos(angle) * radius, 13 + random() * 28, Math.sin(angle) * radius)
+    }
+    stars.needsUpdate = true
+  }
+
   rebuildWorldEnvironment(): void {
     this.scene.remove(this.crystals, this.flora, this.floatingRocks, this.clouds, this.water, this.waterRing)
     for (const object of [this.crystals, this.flora, this.floatingRocks, this.clouds, this.water, this.waterRing]) {
@@ -462,7 +484,26 @@ export class WorldScene {
     this.waterRing = waterParts.ring
     this.waterMaterial = waterParts.material
     this.scene.add(this.crystals, this.flora, this.floatingRocks, this.clouds, this.water, this.waterRing)
+    this.refreshSeededAtmosphere()
     this.updateTerrain()
+  }
+
+  resetAcousticState(): void {
+    this.soundPatternState = { sustainedSince: null, onsetTimes: [], lastOnset: -Infinity }
+    this.soundPattern = 'ambient'
+    this.rhythmStrength = 0
+    this.targetPulse = 0
+    this.currentPulse = 0
+    this.targetBiomeEnergy = 0
+    this.currentBiomeEnergy = 0
+    this.targetPaletteBlend = 0.35
+    this.currentPaletteBlend = 0.35
+    this.targetPitchTone = 0.35
+    this.targetTeal = 0.55
+    this.targetViolet = 0.35
+    this.targetAccentX = this.terrain.frontX
+    this.targetAccentZ = Math.sin((this.targetAccentX + this.terrain.worldWidth / 2) * 0.11) * 2.5
+    this.accentLight.intensity = 0
   }
 
   resetCamera(): void {
@@ -682,6 +723,15 @@ export class WorldScene {
     positions.needsUpdate = true
     colors.needsUpdate = true
     this.geometry.computeVertexNormals()
+    const half = this.terrain.worldWidth / 2
+    const step = this.terrain.worldWidth / (this.terrain.size - 1)
+    this.eventGroup.children.forEach(object => {
+      if (!(object instanceof THREE.Mesh)) return
+      const col = THREE.MathUtils.clamp(Math.round((object.position.x + half) / step), 0, this.terrain.size - 1)
+      const row = THREE.MathUtils.clamp(Math.round((object.position.z + half) / step), 0, this.terrain.size - 1)
+      const height = this.terrain.heights[row * this.terrain.size + col]
+      object.userData.baseY = height + Number(object.userData.surfaceOffset ?? 0.38)
+    })
   }
 
   private updateTerrainColors(): void {
