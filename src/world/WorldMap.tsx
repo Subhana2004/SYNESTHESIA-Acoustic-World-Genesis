@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { getBiomeWeights } from './biomes'
 import type { TerrainState } from './terrain'
 import type { WorldLandmark } from './discovery'
@@ -20,6 +20,13 @@ const biomeColor = (height: number): string => {
 }
 
 export function WorldMap({ terrain, revision, selected, onSelect, landmarks, discoveredIds }: Props) {
+  const [keyboardCell, setKeyboardCell] = useState({ x: 12, z: 12 })
+  const selectCell = (x: number, z: number) => {
+    const col = Math.max(0, Math.min(24, x))
+    const row = Math.max(0, Math.min(24, z))
+    setKeyboardCell({ x: col, z: row })
+    onSelect((col / 24 - 0.5) * terrain.worldWidth, (row / 24 - 0.5) * terrain.worldWidth)
+  }
   const cells = useMemo(() => {
     const count = 25
     const result: Array<{ x: number; z: number; color: string }> = []
@@ -46,11 +53,27 @@ export function WorldMap({ terrain, revision, selected, onSelect, landmarks, dis
       <div><div className="eyebrow">WORLD NAVIGATION</div><p>SELECT A REGION TO EXPLORE</p></div>
       <span>25 × 25</span>
     </div>
-    <svg className="world-map" viewBox="0 0 100 100" role="button" tabIndex={0} aria-label="World map. Select a region to inspect its biome and elevation." onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSelect(0, 0) } }} onClick={event => {
+    <svg className="world-map" viewBox="0 0 100 100" role="application" tabIndex={0} aria-label="World map. Use arrow keys to move the selection and Enter or Space to inspect a region." aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Enter Space" onKeyDown={event => {
+      const directions: Record<string, [number, number]> = {
+        ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1],
+      }
+      const direction = directions[event.key]
+      if (direction) {
+        event.preventDefault()
+        setKeyboardCell(current => {
+          const next = { x: Math.max(0, Math.min(24, current.x + direction[0])), z: Math.max(0, Math.min(24, current.z + direction[1])) }
+          onSelect((next.x / 24 - 0.5) * terrain.worldWidth, (next.z / 24 - 0.5) * terrain.worldWidth)
+          return next
+        })
+      } else if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault()
+        selectCell(keyboardCell.x, keyboardCell.z)
+      }
+    }} onClick={event => {
       const rect = event.currentTarget.getBoundingClientRect()
       const px = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width))
       const pz = Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height))
-      onSelect((px - 0.5) * terrain.worldWidth, (pz - 0.5) * terrain.worldWidth)
+      selectCell(Math.round(px * 24), Math.round(pz * 24))
     }}>
       {cells.map(cell => <rect key={cell.z * 25 + cell.x} x={cell.x * 4} y={cell.z * 4} width="4.1" height="4.1" fill={cell.color} />)}
       <line x1={front} y1="0" x2={front} y2="100" stroke="#f1d79c" strokeWidth="0.8" strokeDasharray="2 2" />
