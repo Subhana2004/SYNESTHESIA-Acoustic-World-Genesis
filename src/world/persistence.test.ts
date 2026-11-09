@@ -91,6 +91,8 @@ describe('portable world files', () => {
       timestamp: 1234, rms: 0.2, pitchHz: 520, pitchConfidence: 0.9,
       spectralCentroidHz: 1800, onsetStrength: 0.9, isSilent: false,
     }, 'accent', 6)!
+    event.x = 0
+    event.z = 0
     const imported = parseWorldFile(file({ ...world, events: [event, { ...event, x: 100 }] }))
     expect(imported.events).toEqual([event])
   })
@@ -100,6 +102,8 @@ describe('portable world files', () => {
       timestamp: 1234, rms: 0.2, pitchHz: 520, pitchConfidence: 0.9,
       spectralCentroidHz: 1800, onsetStrength: 0.9, isSilent: false,
     }, 'accent', 3)!
+    event.x = 0
+    event.z = 0
     const imported = parseWorldFile(file({ ...world, events: [event, { ...event, intensity: 4 }] }))
     expect(imported.events).toEqual([event])
   })
