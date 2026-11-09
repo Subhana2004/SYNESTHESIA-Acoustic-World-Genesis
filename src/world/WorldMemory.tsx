@@ -60,7 +60,7 @@ export function WorldMemory({ terrain, history, discoveredIds, stop, onWorldChan
     const replayed = replayTerrain(terrain.seed, terrain.size, terrain.worldWidth, events)
     terrain.heights.set(replayed.heights)
     terrain.frontX = replayed.frontX
-    onWorldChange(events.length)
+    onWorldChange(events.length, discoveredIds)
     setMessage('Creation replayed from the recorded acoustic feature stream.')
   }
 
@@ -149,6 +149,7 @@ export function WorldMemory({ terrain, history, discoveredIds, stop, onWorldChan
           <span className="world-card-meta">{new Date(world.savedAt).toLocaleDateString()} · SEED {world.seed}</span>
           <span className="world-card-meta">{world.sculptCount.toLocaleString()} ACOUSTIC EVENTS</span>
           <span className="world-card-meta">{world.discoveredCount} / {world.landmarkCount} LANDMARKS · {world.explorationPercent}% EXPLORED</span>
+          <span className="world-exploration-track" role="progressbar" aria-label={world.name + ' exploration'} aria-valuemin={0} aria-valuemax={100} aria-valuenow={world.explorationPercent}><span style={{ width: world.explorationPercent + '%' }} /></span>
         </button>)}
       </div>
     }
