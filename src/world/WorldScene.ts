@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import type { AtmosphereControls } from '../audio/features'
 import type { TerrainState } from './terrain'
+import { generateEnvironmentLayout } from './environment'
 
 export class WorldScene {
   private renderer: THREE.WebGLRenderer
@@ -31,6 +32,9 @@ export class WorldScene {
   private waterMaterial: THREE.MeshStandardMaterial
   private targetPaletteBlend = 0.35
   private currentPaletteBlend = 0.35
+  private flora: THREE.Group
+  private floatingRocks: THREE.InstancedMesh
+  private clouds: THREE.Group
 
   constructor(private host: HTMLDivElement, private terrain: TerrainState) {
     this.scene.background = new THREE.Color('#080a12')
@@ -107,6 +111,12 @@ export class WorldScene {
     this.crystals = this.createRidgeCrystals()
     this.scene.add(this.crystals)
 
+    const environment = this.createEnvironment()
+    this.flora = environment.flora
+    this.floatingRocks = environment.floatingRocks
+    this.clouds = environment.clouds
+    this.scene.add(this.flora, this.floatingRocks, this.clouds)
+
     const waterParts = this.createBasinWater()
     this.water = waterParts.surface
     this.waterRing = waterParts.ring
@@ -137,6 +147,81 @@ export class WorldScene {
     this.targetAccentZ = Math.sin((this.targetAccentX + this.terrain.worldWidth / 2) * 0.11) * 2.5
     const accentColor = new THREE.Color('#55d6c2').lerp(new THREE.Color('#9b7bff'), blend)
     this.accentLight.color.copy(accentColor)
+  }
+
+  private createEnvironment(): { flora: THREE.Group; floatingRocks: THREE.InstancedMesh; clouds: THREE.Group } {
+    const layout = generateEnvironmentLayout(this.terrain)
+    const flora = new THREE.Group()
+    const stemGeometry = new THREE.CylinderGeometry(0.035, 0.075, 0.7, 5)
+    const stemMaterial = new THREE.MeshStandardMaterial({
+      color: '#254c4c', roughness: 0.72, metalness: 0.12,
+    })
+    const stems = new THREE.InstancedMesh(stemGeometry, stemMaterial, layout.flora.length)
+    const bulbGeometry = new THREE.IcosahedronGeometry(0.15, 1)
+    const bulbMaterial = new THREE.MeshStandardMaterial({
+      color: '#9ee9dc', emissive: '#2cbaaa', emissiveIntensity: 1.65,
+      roughness: 0.28, metalness: 0.08,
+    })
+    const bulbs = new THREE.InstancedMesh(bulbGeometry, bulbMaterial, layout.flora.length)
+    const transform = new THREE.Object3D()
+    layout.flora.forEach((plant, index) => {
+      const height = 0.7 * plant.scale
+      transform.position.set(plant.x, plant.y + height * 0.5, plant.z)
+      transform.rotation.set(0, plant.hue * Math.PI * 2, (plant.hue - 0.5) * 0.16)
+      transform.scale.set(plant.scale, plant.scale, plant.scale)
+      transform.updateMatrix()
+      stems.setMatrixAt(index, transform.matrix)
+
+      transform.position.set(plant.x, plant.y + height * 0.96, plant.z)
+      transform.scale.setScalar(plant.scale * (0.72 + plant.hue * 0.28))
+      transform.updateMatrix()
+      bulbs.setMatrixAt(index, transform.matrix)
+      const glow = new THREE.Color().setHSL(0.46 + plant.hue * 0.17, 0.72, 0.62)
+      bulbs.setColorAt(index, glow)
+    })
+    stems.instanceMatrix.needsUpdate = true
+    bulbs.instanceMatrix.needsUpdate = true
+    flora.add(stems, bulbs)
+
+    const rockGeometry = new THREE.DodecahedronGeometry(1, 0)
+    const rockMaterial = new THREE.MeshStandardMaterial({
+      color: '#45465f', emissive: '#17152b', emissiveIntensity: 0.28,
+      roughness: 0.92, metalness: 0.12, flatShading: true,
+    })
+    const floatingRocks = new THREE.InstancedMesh(rockGeometry, rockMaterial, layout.floatingRocks.length)
+    layout.floatingRocks.forEach((rock, index) => {
+      transform.position.set(rock.x, rock.y, rock.z)
+      transform.rotation.set(rock.rotation * 0.35, rock.rotation, rock.rotation * 0.2)
+      transform.scale.set(rock.scale * 1.25, rock.scale * 0.72, rock.scale)
+      transform.updateMatrix()
+      floatingRocks.setMatrixAt(index, transform.matrix)
+    })
+    floatingRocks.instanceMatrix.needsUpdate = true
+
+    const clouds = new THREE.Group()
+    const cloudGeometry = new THREE.SphereGeometry(1, 12, 8)
+    const cloudMaterial = new THREE.MeshStandardMaterial({
+      color: '#8585ad', transparent: true, opacity: 0.13,
+      roughness: 1, depthWrite: false,
+    })
+    layout.clouds.forEach(cloud => {
+      const cluster = new THREE.Group()
+      const lobes = [
+        { x: 0, y: 0, z: 0, scale: 1.0 },
+        { x: 0.72, y: 0.12, z: 0.18, scale: 0.72 },
+        { x: -0.68, y: -0.08, z: -0.12, scale: 0.82 },
+      ]
+      lobes.forEach(lobe => {
+        const puff = new THREE.Mesh(cloudGeometry, cloudMaterial)
+        puff.position.set(lobe.x * cloud.scale, lobe.y * cloud.scale, lobe.z * cloud.scale)
+        puff.scale.set(cloud.scale * lobe.scale, cloud.scale * 0.34 * lobe.scale, cloud.scale * 0.62 * lobe.scale)
+        cluster.add(puff)
+      })
+      cluster.position.set(cloud.x, cloud.y, cloud.z)
+      cluster.userData.phase = cloud.phase
+      clouds.add(cluster)
+    })
+    return { flora, floatingRocks, clouds }
   }
 
   private createBasinWater(): { surface: THREE.Mesh; ring: THREE.Mesh; material: THREE.MeshStandardMaterial } {
@@ -295,6 +380,13 @@ export class WorldScene {
     this.waterMaterial.emissiveIntensity = 0.24 + Math.sin(time * 2.2) * 0.08
     this.waterMaterial.opacity = 0.68 + Math.sin(time * 1.3) * 0.035
     this.waterRing.rotation.z = Math.sin(time * 0.7) * 0.025
+    this.flora.rotation.z = Math.sin(time * 1.7) * 0.006
+    this.floatingRocks.rotation.y = time * 0.045
+    this.clouds.children.forEach(cluster => {
+      const phase = Number(cluster.userData.phase) || 0
+      cluster.position.x += Math.sin(time * 0.7 + phase) * 0.0015
+      cluster.rotation.y = Math.sin(time * 0.4 + phase) * 0.035
+    })
     this.targetPulse *= 0.9
     this.accentLight.intensity = this.currentPulse * 5.5
     this.accentLight.position.set(this.targetAccentX, 2.5, this.targetAccentZ)
@@ -330,6 +422,20 @@ export class WorldScene {
     this.crystals.traverse(object => {
       if (object instanceof THREE.Mesh) object.geometry.dispose()
     })
+    const environmentGeometries = new Set<THREE.BufferGeometry>()
+    const environmentMaterials = new Set<THREE.Material>()
+    for (const group of [this.flora, this.clouds]) group.traverse(object => {
+      if (object instanceof THREE.Mesh || object instanceof THREE.InstancedMesh) {
+        environmentGeometries.add(object.geometry)
+        const materials = Array.isArray(object.material) ? object.material : [object.material]
+        materials.forEach(material => environmentMaterials.add(material))
+      }
+    })
+    environmentGeometries.add(this.floatingRocks.geometry)
+    const rockMaterials = Array.isArray(this.floatingRocks.material) ? this.floatingRocks.material : [this.floatingRocks.material]
+    rockMaterials.forEach(material => environmentMaterials.add(material))
+    environmentGeometries.forEach(geometry => geometry.dispose())
+    environmentMaterials.forEach(material => material.dispose())
     const crystalMaterials = new Set<THREE.Material>()
     this.crystals.traverse(object => {
       if (object instanceof THREE.Mesh) {
