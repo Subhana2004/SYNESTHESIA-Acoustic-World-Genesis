@@ -80,6 +80,21 @@ describe('portable world files', () => {
     expect(snapshot.events).toEqual([event])
   })
 
+  it('rejects corrupted acoustic feature values and world dimensions', () => {
+    const invalidHistory = { ...world, history: [{ ...world.history[0], features: { ...world.history[0].features, rms: 2 } }] }
+    expect(() => parseWorldFile(file(invalidHistory))).toThrow('invalid acoustic history')
+    expect(() => parseWorldFile(file({ ...world, worldWidth: 2048 }))).toThrow('invalid terrain data')
+  })
+
+  it('drops event markers outside the imported world bounds', () => {
+    const event = createWorldEvent(createTerrain(), {
+      timestamp: 1234, rms: 0.2, pitchHz: 520, pitchConfidence: 0.9,
+      spectralCentroidHz: 1800, onsetStrength: 0.9, isSilent: false,
+    }, 'accent', 6)!
+    const imported = parseWorldFile(file({ ...world, events: [event, { ...event, x: 100 }] }))
+    expect(imported.events).toEqual([event])
+  })
+
   it('preserves a validated event journal when importing a world', () => {
     const event = createWorldEvent(createTerrain(), {
       timestamp: 1234, rms: 0.2, pitchHz: 520, pitchConfidence: 0.9,
