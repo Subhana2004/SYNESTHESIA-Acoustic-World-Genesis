@@ -36,6 +36,8 @@ export class WorldScene {
   private frame = 0
   private disposed = false
   private resizeObserver: ResizeObserver | null = null
+  private reducedMotion = false
+  private lastReducedMotionRender = 0
   private tealLight: THREE.PointLight
   private violetLight: THREE.PointLight
   private accentLight: THREE.PointLight
@@ -91,6 +93,7 @@ export class WorldScene {
   private lastTerrainColorUpdate = 0
 
   constructor(private host: HTMLDivElement, private terrain: TerrainState) {
+    this.reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
     this.scene.background = new THREE.Color('#080a12')
     this.scene.fog = new THREE.FogExp2('#111827', 0.022)
     this.camera.position.set(24, 19, 29)
@@ -764,7 +767,9 @@ export class WorldScene {
     if (this.disposed) return
     this.frame = requestAnimationFrame(this.animate)
     const now = performance.now()
-    const time = now * 0.00025
+    if (this.reducedMotion && now - this.lastReducedMotionRender < 100) return
+    this.lastReducedMotionRender = now
+    const time = this.reducedMotion ? 0 : now * 0.00025
     this.tealLight.position.x = -10 + Math.sin(time) * 2.2
     this.tealLight.position.z = 2 + Math.cos(time * 0.8) * 2
     this.tealLight.intensity = THREE.MathUtils.lerp(this.tealLight.intensity, this.targetTeal, 0.035)
@@ -834,8 +839,8 @@ export class WorldScene {
     this.eventGroup.children.forEach(object => {
       if (!(object instanceof THREE.Mesh)) return
       const phase = Number(object.userData.phase) || 0
-      object.rotation.z += object.userData.kind === 'meteor-shower' ? 0.0018 : 0.0007
-      object.position.y = Number(object.userData.baseY) + Math.sin(time * 1.25 + phase) * 0.09
+      if (!this.reducedMotion) object.rotation.z += object.userData.kind === 'meteor-shower' ? 0.0018 : 0.0007
+      object.position.y = Number(object.userData.baseY) + (this.reducedMotion ? 0 : Math.sin(time * 1.25 + phase) * 0.09)
       const material = object.material as THREE.MeshStandardMaterial
       material.emissiveIntensity = 0.65 + this.currentPulse * 0.28
     })
@@ -861,15 +866,17 @@ export class WorldScene {
     this.targetPulse *= 0.9
     this.accentLight.intensity = this.currentPulse * 5.5
     this.accentLight.position.set(this.targetAccentX, 2.5, this.targetAccentZ)
-    const mistPositions = this.mist.geometry.attributes.position as THREE.BufferAttribute
-    for (let i = 0; i < this.mistPhases.length; i++) {
-      const offset = i * 3
-      this.mistPositions[offset] += Math.sin(time * 2 + this.mistPhases[i]) * 0.0018
-      this.mistPositions[offset + 1] += Math.sin(time * 1.4 + this.mistPhases[i]) * 0.0012
-      if (this.mistPositions[offset] > this.terrain.worldWidth / 2) this.mistPositions[offset] = -this.terrain.worldWidth / 2
-      if (this.mistPositions[offset] < -this.terrain.worldWidth / 2) this.mistPositions[offset] = this.terrain.worldWidth / 2
+    if (!this.reducedMotion) {
+      const mistPositions = this.mist.geometry.attributes.position as THREE.BufferAttribute
+      for (let i = 0; i < this.mistPhases.length; i++) {
+        const offset = i * 3
+        this.mistPositions[offset] += Math.sin(time * 2 + this.mistPhases[i]) * 0.0018
+        this.mistPositions[offset + 1] += Math.sin(time * 1.4 + this.mistPhases[i]) * 0.0012
+        if (this.mistPositions[offset] > this.terrain.worldWidth / 2) this.mistPositions[offset] = -this.terrain.worldWidth / 2
+        if (this.mistPositions[offset] < -this.terrain.worldWidth / 2) this.mistPositions[offset] = this.terrain.worldWidth / 2
+      }
+      mistPositions.needsUpdate = true
     }
-    mistPositions.needsUpdate = true
     this.mist.rotation.y = Math.sin(time * 0.35) * 0.025
     this.stars.rotation.y = time * 0.018
     this.controls.update()
