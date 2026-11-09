@@ -88,9 +88,9 @@ export class WorldScene {
     this.moteAngles = new Float32Array(moteCount)
     this.moteRadii = new Float32Array(moteCount)
     for (let i = 0; i < moteCount; i++) {
-      this.motePhases[i] = random() * Math.PI * 2
-      this.moteAngles[i] = random() * Math.PI * 2
-      this.moteRadii[i] = 0.7 + random() * 3.8
+      this.motePhases[i] = ((i * 2.399963) % (Math.PI * 2))
+      this.moteAngles[i] = ((i * 1.618034) % (Math.PI * 2))
+      this.moteRadii[i] = 0.7 + ((i * 37) % 101) / 101 * 3.8
     }
     const moteGeometry = new THREE.BufferGeometry()
     moteGeometry.setAttribute('position', new THREE.BufferAttribute(this.motePositions, 3))
