@@ -4,6 +4,7 @@ import type { AtmosphereControls } from '../audio/features'
 import type { TerrainState } from './terrain'
 import { generateEnvironmentLayout } from './environment'
 import { getBiomeWeights } from './biomes'
+import { updateSoundPattern, type SoundPattern, type SoundPatternState } from './soundPatterns'
 
 export class WorldScene {
   private renderer: THREE.WebGLRenderer
@@ -46,6 +47,9 @@ export class WorldScene {
   private moteAngles: Float32Array
   private moteRadii: Float32Array
   private moteMaterial: THREE.PointsMaterial
+  private soundPatternState: SoundPatternState = { sustainedSince: null, onsetTimes: [], lastOnset: -Infinity }
+  private soundPattern: SoundPattern = 'ambient'
+  private rhythmStrength = 0
 
   constructor(private host: HTMLDivElement, private terrain: TerrainState) {
     this.scene.background = new THREE.Color('#080a12')
@@ -186,6 +190,12 @@ export class WorldScene {
     this.targetPitchTone = THREE.MathUtils.clamp(controls.pitchTone, 0, 1)
     const energy = THREE.MathUtils.clamp(controls.energy, 0, 1)
     this.targetBiomeEnergy = energy
+    const pattern = updateSoundPattern(
+      this.soundPatternState, energy, controls.onsetPulse, performance.now(),
+    )
+    this.soundPatternState = pattern.state
+    this.soundPattern = pattern.pattern
+    this.rhythmStrength = pattern.rhythmStrength
     this.targetTeal = 0.18 + (1 - blend) * 1.15 + energy * 0.35
     this.targetViolet = 0.18 + blend * 1.2 + energy * 0.25
     this.targetPulse = Math.max(this.targetPulse, THREE.MathUtils.clamp(controls.onsetPulse, 0, 1))
@@ -465,12 +475,15 @@ export class WorldScene {
     this.moteMaterial.size = 0.045 + this.currentBiomeEnergy * 0.1 + this.currentPulse * 0.12
     const moteAttribute = this.soundMotes.geometry.attributes.position as THREE.BufferAttribute
     for (let i = 0; i < this.motePhases.length; i++) {
+      const rhythmicBeat = Math.sin(time * 7.5) * this.rhythmStrength * 0.18
       const phase = this.motePhases[i] + time * (0.32 + this.targetPitchTone * 0.55)
       const radius = this.moteRadii[i] + this.currentPulse * (1.2 + this.targetPitchTone)
+        + rhythmicBeat
       const angle = this.moteAngles[i] + phase * 0.22
       const offset = i * 3
       this.motePositions[offset] = Math.cos(angle) * radius
-      this.motePositions[offset + 1] = 0.25 + Math.sin(phase * 1.7) * (0.18 + this.currentBiomeEnergy * 0.6)
+      const verticalMotion = this.soundPattern === 'sustained' ? 1.8 : 0.6
+      this.motePositions[offset + 1] = 0.25 + Math.sin(phase * verticalMotion) * (0.18 + this.currentBiomeEnergy * 0.6)
       this.motePositions[offset + 2] = Math.sin(angle) * radius
     }
     moteAttribute.needsUpdate = true
@@ -486,7 +499,8 @@ export class WorldScene {
     })
     if (Math.floor(performance.now() / 16) % 8 === 0) this.updateTerrainColors()
     this.water.rotation.y = Math.sin(time * 1.8) * 0.012
-    this.waterMaterial.emissiveIntensity = 0.24 + Math.sin(time * 2.2) * 0.08
+    const rhythmicWaterPulse = Math.max(0, Math.sin(time * 7.5)) * this.rhythmStrength * 0.32
+    this.waterMaterial.emissiveIntensity = 0.24 + Math.sin(time * 2.2) * 0.08 + rhythmicWaterPulse
     this.waterMaterial.opacity = 0.68 + Math.sin(time * 1.3) * 0.035
     this.waterRing.rotation.z = Math.sin(time * 0.7) * 0.025
     this.flora.rotation.z = Math.sin(time * 1.7) * 0.006
@@ -498,14 +512,16 @@ export class WorldScene {
         const frequency = biome === 'mire' ? 1.25 : biome === 'forest' ? 0.72 : 1.8
         const pulse = (Math.sin(time * frequency * 3 + phase) + 1) * 0.5
         const onsetBoost = this.currentPulse * (biome === 'highlands' ? 1.35 : 0.85)
+        const rhythmicBoost = this.rhythmStrength * Math.max(0, Math.sin(time * 7.5 + phase)) * 0.65
         const energyBoost = this.currentBiomeEnergy * (biome === 'forest' ? 0.75 : 1.1)
         const material = object.material as THREE.MeshStandardMaterial
-        material.emissiveIntensity = 0.85 + pulse * 0.7 + energyBoost + onsetBoost
+        material.emissiveIntensity = 0.85 + pulse * 0.7 + energyBoost + onsetBoost + rhythmicBoost
         const breath = 1 + pulse * 0.025 + onsetBoost * 0.018
         object.scale.setScalar(breath)
       })
     })
-    this.floatingRocks.rotation.y = time * 0.045
+    this.floatingRocks.rotation.y = time * (0.045 + this.rhythmStrength * 0.055)
+    this.floatingRocks.scale.setScalar(1 + (this.soundPattern === 'accent' ? this.currentPulse * 0.045 : 0))
     const rockMaterial = this.floatingRocks.material as THREE.MeshStandardMaterial
     rockMaterial.emissiveIntensity = 0.22 + this.currentBiomeEnergy * 0.55 + this.currentPulse * 0.75
     rockMaterial.emissive.copy(new THREE.Color('#17152b').lerp(
@@ -514,7 +530,8 @@ export class WorldScene {
     this.clouds.children.forEach(cluster => {
       const phase = Number(cluster.userData.phase) || 0
       const baseX = Number(cluster.userData.baseX) || 0
-      cluster.position.x = baseX + Math.sin(time * 0.7 + phase) * (0.18 + this.currentBiomeEnergy * 0.32)
+      const cloudDrift = this.soundPattern === 'sustained' ? 1.8 : this.soundPattern === 'rhythmic' ? 1.25 : 0.7
+      cluster.position.x = baseX + Math.sin(time * cloudDrift + phase) * (0.18 + this.currentBiomeEnergy * 0.32)
       cluster.position.y = (Number(cluster.userData.baseY) || 0) + Math.sin(time * 0.35 + phase) * 0.08
       cluster.rotation.y = Math.sin(time * 0.4 + phase) * 0.035
       cluster.children.forEach(puff => {
