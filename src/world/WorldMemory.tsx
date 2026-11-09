@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type MutableRefObject } from 'react'
 import { listSavedWorlds, loadWorld, restoreWorld, saveWorld, snapshotWorld } from './persistence'
 import { replayTerrain, type TerrainState } from './terrain'
 import type { RecordedSculpt } from './persistence'
 
 type SavedWorldSummary = { id: string; name: string; savedAt: number; seed: number }
-type Props = { terrain: TerrainState; history: React.MutableRefObject<RecordedSculpt[]>; stop: () => void; onWorldChange: (count: number) => void }
+type Props = { terrain: TerrainState; history: MutableRefObject<RecordedSculpt[]>; stop: () => void; onWorldChange: (count: number) => void }
 
 export function WorldMemory({ terrain, history, stop, onWorldChange }: Props) {
   const [worlds, setWorlds] = useState<SavedWorldSummary[]>([])
