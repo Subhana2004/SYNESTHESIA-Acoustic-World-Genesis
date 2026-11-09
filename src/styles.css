@@ -129,3 +129,5 @@ button:disabled{cursor:not-allowed}
 }
 
 .scene-error{position:absolute;inset:18% 8%;z-index:3;display:grid;place-items:center;padding:22px;border:1px solid rgba(220,150,140,.28);background:rgba(8,10,18,.88);color:#e5b6b0;text-align:center;font-size:12px;line-height:1.7;backdrop-filter:blur(12px)}
+
+.scene-loading{position:absolute;inset:0;z-index:2;display:grid;place-items:center;color:#9d9abf;background:rgba(8,10,18,.42);font:9px var(--mono);letter-spacing:.16em;pointer-events:none}
