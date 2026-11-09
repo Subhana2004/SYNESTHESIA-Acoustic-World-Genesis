@@ -1,4 +1,5 @@
 const { test, expect } = require('@playwright/test')
+const fs = require('fs')
 
 test('renders the 3D world and the core instrument interface', async ({ page }, testInfo) => {
   const pageErrors = []
@@ -65,12 +66,19 @@ test('saves, exports, imports, restores, renames and deletes a world', async ({ 
   ])
   const filePath = await download.path()
   expect(filePath).toBeTruthy()
-  await page.locator('input[type="file"]').setInputFiles(filePath)
+  const portableWorld = JSON.parse(fs.readFileSync(filePath, 'utf8'))
+  portableWorld.world.seed = 2027
+  portableWorld.world.events = [{ id: 'event-2027-1', kind: 'meteor-shower', biome: 'forest', x: 0, z: 0, intensity: 0.8, timestamp: 1000 }]
+  await page.locator('input[type="file"]').setInputFiles({ name: 'alternate-seed.synworld.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(portableWorld)) })
   await expect(page.locator('.memory-message')).toContainText('imported into this browser')
   await expect(page.locator('.world-card')).toHaveCount(2)
 
   await page.getByRole('button', { name: 'LOAD WORLD' }).click()
   await expect(page.locator('.memory-message')).toContainText('restored with')
+  await expect(page.locator('.coords')).toContainText('SEED 2027')
+  await expect(page.locator('.world-event-journal')).toContainText('Meteor shower')
+  await page.getByRole('button', { name: /Inspect meteor shower/ }).click()
+  await expect(page.locator('.inspection-panel')).toContainText('World position')
   const name = page.getByRole('textbox', { name: 'World name' })
   await name.fill('Browser verified world')
   await page.getByRole('button', { name: 'RENAME' }).click()
@@ -79,6 +87,8 @@ test('saves, exports, imports, restores, renames and deletes a world', async ({ 
   await page.getByRole('button', { name: 'YES, DELETE' }).click()
   await expect(page.locator('.memory-message')).toContainText('deleted from this browser')
   await expect(page.locator('.world-card')).toHaveCount(1)
+  await page.getByRole('button', { name: 'Reset world' }).click()
+  await expect(page.locator('.coords')).toContainText('SEED 2026')
 })
 
 test('shows a helpful message when microphone permission is denied', async ({ page }) => {
