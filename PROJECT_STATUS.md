@@ -40,7 +40,10 @@ The current branch contains a first end-to-end prototype with M4 environmental c
 - Dark application interface to match the in-world visual direction.
 - Unit tests for core mapping, terrain behaviour and bounded atmospheric controls.
 
-- M4.6 renders three expanding spatial wavefronts at the active generation point. Onset strength reveals each ripple, spectral brightness shifts it from teal to violet, signal energy expands its reach, and stable pitch changes propagation speed and spread. The effect is transient and does not modify terrain or saved-world data.\n\n## M2 visual and behaviour decisions
+- M4.6 renders three expanding spatial wavefronts at the active generation point. Onset strength reveals each ripple, spectral brightness shifts it from teal to violet, signal energy expands its reach, and stable pitch changes propagation speed and spread. The effect is transient and does not modify terrain or saved-world data.
+- M4.7 adds a bounded, fixed-size field of drifting sound motes around the active generation point. Pitch changes their orbital drift, energy and onsets expand and brighten the field, and spectral brightness controls its teal/violet tint.
+
+## M2 visual and behaviour decisions
 
 See M2_DESIGN.md for the full design and acceptance criteria.
 
@@ -51,7 +54,7 @@ See M2_DESIGN.md for the full design and acceptance criteria.
 
 ## Verification status
 
-GitHub Actions passed unit tests and the production build for the M4.3 biome-threshold correction at commit 557c321. M4.6 changes are committed and awaiting their own CI run. Browser microphone/rendering checks, IndexedDB save/reload validation and target-device profiling remain outstanding.
+GitHub Actions passed unit tests and the production build for M4.6 at commit e05f6e1. M4.7 sound-mote changes are committed and awaiting their own CI run. Browser microphone/rendering checks, IndexedDB save/reload validation and target-device profiling remain outstanding.
 
 ## Known limitations
 
@@ -65,7 +68,7 @@ GitHub Actions passed unit tests and the production build for the M4.3 biome-thr
 
 ## Next steps
 
-1. Confirm CI for M4.6 pitch-driven acoustic wavefronts.
+1. Confirm CI for M4.7 sound-responsive motes.
 2. Validate save → reload → restore in a real browser, including malformed or unavailable storage.
 3. Inspect biome transitions, water placement, reflections, camera framing and visual balance.
 4. Plan export/import and undo after the versioned world format is validated.
