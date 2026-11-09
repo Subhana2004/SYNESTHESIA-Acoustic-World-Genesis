@@ -32,6 +32,7 @@ The current branch contains a first end-to-end prototype and the first M2 visual
 - Elevation defines three continuous biome regions: luminous mire in lowlands, echo forest across middle elevations and crystal highlands on peaks. Live spectral brightness shifts their shared accent palette, while signal energy increases the luminous response.
 - Environmental flora now has biome-specific forms: glowing reed-like plants in the mire, mushroom-like caps in the echo forest and angular crystal growths on elevated ridges. Seeded placement is tested against the biome elevation weights.
 - Each flora species now has its own ambient pulse frequency. Live signal energy brightens growth, while onset accents create a stronger temporary glow; subtle scale breathing continues when microphone input is paused.
+- Floating rock formations gain a spectral emissive tint and brighten with energy/onsets. Cloud clusters shift between cool violet tones, become more visible with energy and drift around fixed seeded anchor positions without cumulative positional drift.
 - Orbit exploration supports pan and zoom, with a one-click camera reset.
 - Versioned IndexedDB world storage records terrain dimensions, seed, heightfield, generation front and bounded acoustic sculpt history.
 - Local world gallery supports save, visual terrain-profile previews, rename, delete, load, portable world-file export/import and deterministic replay of the recorded feature stream; no microphone audio samples are stored.
