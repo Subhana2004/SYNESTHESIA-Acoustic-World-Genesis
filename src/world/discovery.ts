@@ -43,7 +43,7 @@ export function discoverWorldLandmarks(terrain: TerrainState, traces: readonly S
 
   const point = (cell: { col: number; row: number; height: number }) => ({
     x: cell.col * step - half,
-    z: half - cell.row * step,
+    z: cell.row * step - half,
     elevation: cell.height,
     biome: biomeAt(cell.height),
   })
