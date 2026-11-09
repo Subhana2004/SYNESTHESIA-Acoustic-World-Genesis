@@ -60,11 +60,9 @@ export function WorldMap({ terrain, revision, selected, onSelect, landmarks, dis
       const direction = directions[event.key]
       if (direction) {
         event.preventDefault()
-        setKeyboardCell(current => {
-          const next = { x: Math.max(0, Math.min(24, current.x + direction[0])), z: Math.max(0, Math.min(24, current.z + direction[1])) }
-          onSelect((next.x / 24 - 0.5) * terrain.worldWidth, (next.z / 24 - 0.5) * terrain.worldWidth)
-          return next
-        })
+        const next = { x: Math.max(0, Math.min(24, keyboardCell.x + direction[0])), z: Math.max(0, Math.min(24, keyboardCell.z + direction[1])) }
+        setKeyboardCell(next)
+        onSelect((next.x / 24 - 0.5) * terrain.worldWidth, (next.z / 24 - 0.5) * terrain.worldWidth)
       } else if (event.key === 'Enter' || event.key === ' ') {
         event.preventDefault()
         selectCell(keyboardCell.x, keyboardCell.z)
