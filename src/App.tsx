@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AudioEngine } from './audio/AudioEngine'
-import type { AcousticFeatures } from './audio/features'
+import { mapAtmosphere, type AcousticFeatures } from './audio/features'
 import { createTerrain, sculptTerrain } from './world/terrain'
 import { WorldScene } from './world/WorldScene'
 
@@ -37,6 +37,7 @@ export default function App() {
     try {
       await engine.start((f) => {
         setFeatures(f)
+        scene.current?.updateAcousticAtmosphere(mapAtmosphere(f), terrain.frontX)
         const now = performance.now()
         if (now - lastUpdate.current < 90) return
         const dt = lastUpdate.current === 0 ? 0.09 : (now - lastUpdate.current) / 1000
@@ -45,6 +46,7 @@ export default function App() {
         sculptTerrain(terrain, f, dt)
         if (terrain.frontX !== before) {
           scene.current?.updateTerrain()
+          scene.current?.updateAcousticAtmosphere(mapAtmosphere(f), terrain.frontX)
           setUpdates(v => v + 1)
         }
       })
@@ -63,6 +65,7 @@ export default function App() {
     terrain.frontX = fresh.frontX
     lastUpdate.current = 0
     scene.current?.updateTerrain()
+    scene.current?.updateAcousticAtmosphere({ spectralBlend: 0.35, onsetPulse: 0, energy: 0 }, terrain.frontX)
     setUpdates(0)
     setFeatures(null)
   }
