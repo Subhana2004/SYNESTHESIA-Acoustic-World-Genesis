@@ -91,6 +91,9 @@ export function WorldMemory({ terrain, history, discoveredIds, events, stop, onW
       if (file.size > 20 * 1024 * 1024) throw new Error('World files must be smaller than 20 MB.')
       const parsed: unknown = JSON.parse(await file.text())
       const record = parseWorldFile(parsed)
+      if (record.size !== terrain.size || record.worldWidth !== terrain.worldWidth) {
+        throw new Error('This world uses a different terrain resolution or world size and cannot be loaded by this version.')
+      }
       await saveWorld(record)
       await refresh()
       setSelected(record.id)
