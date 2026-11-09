@@ -58,11 +58,12 @@ Last updated: 2026-11-10
 
 ## Verification
 
-- GitHub Actions previously passed the M5.6 unit-test and production-build checks at commit 7077ba3.
-- The expanded Playwright workflow now runs unit tests, a production build, and desktop/mobile Chromium browser checks with software WebGL and a fake microphone.
-- The first expanded CI run for the current branch is pending. Do not treat browser validation as complete until that run passes.
+- Full GitHub Actions validation passed at commit 71e9ee5: 57 unit tests across 9 files, TypeScript checks, production Vite build, production dependency audit and 16 Playwright browser checks.
+- The 16 browser checks passed on both desktop Chromium and mobile Chromium using software WebGL and a fake microphone. They cover 3D rendering, WebGL fallback, camera controls, keyboard minimap navigation, microphone permission failure/success, mobile overflow, world save/export/import/load/rename/delete, alternate-seed restoration and saved-event navigation.
+- The build separates the initial interface bundle (about 176 KB / 58 KB gzip) from the lazy-loaded Three.js core (about 486 KB / 123 KB gzip) and controls bundle (about 19 KB / 4 KB gzip).
+- Production dependency audit passes at high severity threshold. Browser test screenshots and logs are retained as a GitHub Actions artifact.
+- A small final change resets transient sound-pattern state when microphone input is paused; its full CI run is in progress on the current branch head.
 - Physical-device microphone quality, real GPU profiling and browser-specific WebGL behaviour remain outside automated CI.
-
 ## Known limitations and next validation targets
 
 - Pitch estimation is a lightweight autocorrelation starter, not a validated production pitch tracker.
