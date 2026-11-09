@@ -91,3 +91,39 @@ footer{display:flex;justify-content:space-between;padding:22px 0 34px;color:#6e7
 .event-empty{margin:0;padding:16px;border:1px dashed var(--line);color:#969bb2;font-size:10px;line-height:1.7}
 .event-footnote{margin:12px 0 0;color:#747b98;letter-spacing:.04em}
 @media(max-width:520px){.world-event-journal{padding:13px}.event-list{grid-template-columns:1fr 1fr}.event-entry{padding:10px}.event-entry>strong{font-size:11px}}
+
+/* Keyboard, touch and reduced-motion finishing pass */
+:where(a,button,input,.world-map):focus-visible{outline:2px solid #b8a9ff;outline-offset:3px}
+button:disabled{cursor:not-allowed}
+.world-map:focus-visible{outline-offset:4px}
+.event-entry{appearance:none;width:100%;text-align:left;font:inherit;cursor:pointer;transition:border-color .18s,background .18s}
+.event-entry:hover{border-color:rgba(184,169,255,.55);background:rgba(40,34,67,.62)}
+.event-entry:active{transform:translateY(1px)}
+.event-toggle{justify-self:start;min-height:34px;margin-top:12px;font:8px var(--mono);letter-spacing:.1em}
+.skip-link{position:absolute;left:12px;top:-60px;z-index:20;padding:10px 14px;background:#e8e5fa;color:#101426}
+.skip-link:focus{top:12px}
+@media(max-width:760px){
+  .world-foot{font-size:7px;padding:0 9px;gap:8px}
+  .world-foot span:last-child{text-align:right}
+  .memory-heading{align-items:flex-start}
+  .memory-actions .secondary{min-height:40px}
+}
+@media(max-width:390px){
+  .shell{width:calc(100% - 24px)}
+  .brand{font-size:11px;letter-spacing:.14em;gap:8px}
+  .brand-mark{width:24px;height:24px}
+  .local{padding:7px;font-size:7px;letter-spacing:.08em}
+  .world-head{font-size:7px}
+  .world-foot{font-size:6px;letter-spacing:.08em}
+  .view-controls .view-reset{min-width:29px}
+  .readouts>div{padding:12px 7px}
+  .readouts span{font-size:6px;letter-spacing:.07em}
+  .readouts strong{font-size:17px}
+  .readouts small{font-size:6px;letter-spacing:.04em}
+  .journal-heading{align-items:flex-start}
+  .journal-heading>span{font-size:7px;text-align:right}
+  .event-entry>span,.event-entry>small{font-size:6px}
+}
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+}
