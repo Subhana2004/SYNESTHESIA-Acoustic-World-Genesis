@@ -19,6 +19,7 @@ export default function App() {
   const scene = useRef<WorldScene | null>(null)
   const audio = useRef<AudioEngine | null>(null)
   const lastUpdate = useRef(0)
+  const startAttempt = useRef(0)
   const history = useRef<RecordedSculpt[]>([])
   const eventHistory = useRef<WorldEvent[]>([])
   const eventSequence = useRef(0)
@@ -46,15 +47,21 @@ export default function App() {
   }, [])
 
   const stop = useCallback(() => {
+    startAttempt.current += 1
     audio.current?.stop()
     audio.current = null
+    lastUpdate.current = 0
     setListening(false)
     setStarting(false)
   }, [])
-  useEffect(() => () => { audio.current?.stop() }, [])
+  useEffect(() => () => {
+    startAttempt.current += 1
+    audio.current?.stop()
+  }, [])
 
   const start = async () => {
     if (starting || listening) return
+    const attempt = ++startAttempt.current
     setStarting(true)
     setError('')
     const engine = new AudioEngine()
@@ -93,13 +100,18 @@ export default function App() {
           setUpdates(v => v + 1)
         }
       })
+      if (attempt !== startAttempt.current) {
+        engine.stop()
+        return
+      }
       setListening(true)
     } catch (e) {
       engine.stop()
+      if (attempt !== startAttempt.current) return
       audio.current = null
       setError(e instanceof Error ? e.message : 'Unable to start microphone input.')
     } finally {
-      setStarting(false)
+      if (attempt === startAttempt.current) setStarting(false)
     }
   }
 
@@ -134,7 +146,9 @@ export default function App() {
     const fresh = createTerrain()
     terrain.heights.set(fresh.heights)
     terrain.frontX = fresh.frontX
+    terrain.seed = fresh.seed
     lastUpdate.current = 0
+    scene.current?.rebuildWorldEnvironment()
     scene.current?.updateTerrain()
     scene.current?.clearInspection()
     scene.current?.updateSoundTraces([])
@@ -228,7 +242,7 @@ export default function App() {
         </div>
       </div>
       <WorldMemory terrain={terrain} history={history} discoveredIds={discoveredIds} events={worldEvents} stop={stop} onWorldChange={(count, restoredDiscoveredIds = [], restoredEvents = []) => {
-        scene.current?.updateTerrain()
+        scene.current?.rebuildWorldEnvironment()
         scene.current?.clearInspection()
         scene.current?.updateSoundTraces(history.current)
         scene.current?.updateAcousticAtmosphere({ spectralBlend: 0.35, onsetPulse: 0, energy: 0, pitchTone: 0.35 }, terrain.frontX)
