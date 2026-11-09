@@ -52,13 +52,28 @@ export class WorldScene {
   private soundPattern: SoundPattern = 'ambient'
   private rhythmStrength = 0
   private traceGroup = new THREE.Group()
+  private readonly tealColor = new THREE.Color('#55d6c2')
+  private readonly violetColor = new THREE.Color('#a58cff')
+  private readonly rockBaseColor = new THREE.Color('#17152b')
+  private readonly rockAccentColor = new THREE.Color('#4c3e83')
+  private readonly cloudBaseColor = new THREE.Color('#8585ad')
+  private readonly cloudAccentColor = new THREE.Color('#8b72c8')
+  private readonly terrainPalettes = [new THREE.Color('#174b55'), new THREE.Color('#285b50'), new THREE.Color('#51446f')]
+  private readonly terrainAccentLow = new THREE.Color('#287e83')
+  private readonly terrainAccentHigh = new THREE.Color('#9870c7')
+  private readonly terrainDark = new THREE.Color('#172536')
+  private readonly terrainColorResult = new THREE.Color()
+  private readonly terrainColorScratch = new THREE.Color()
+  private readonly terrainSpectralScratch = new THREE.Color()
+  private readonly terrainEnergyScratch = new THREE.Color()
+  private lastTerrainColorUpdate = 0
 
   constructor(private host: HTMLDivElement, private terrain: TerrainState) {
     this.scene.background = new THREE.Color('#080a12')
     this.scene.fog = new THREE.FogExp2('#111827', 0.022)
     this.camera.position.set(24, 19, 29)
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'low-power' })
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5))
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25))
     this.renderer.outputColorSpace = THREE.SRGBColorSpace
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping
     this.renderer.toneMappingExposure = 1.05
@@ -184,6 +199,7 @@ export class WorldScene {
     this.updateTerrain()
     this.resize()
     window.addEventListener('resize', this.resize)
+    document.addEventListener('visibilitychange', this.handleVisibilityChange)
     this.animate()
   }
 
@@ -204,8 +220,7 @@ export class WorldScene {
     this.targetPulse = Math.max(this.targetPulse, THREE.MathUtils.clamp(controls.onsetPulse, 0, 1))
     this.targetAccentX = THREE.MathUtils.clamp(frontX, -this.terrain.worldWidth / 2, this.terrain.worldWidth / 2)
     this.targetAccentZ = Math.sin((this.targetAccentX + this.terrain.worldWidth / 2) * 0.11) * 2.5
-    const accentColor = new THREE.Color('#55d6c2').lerp(new THREE.Color('#9b7bff'), blend)
-    this.accentLight.color.copy(accentColor)
+    this.accentLight.color.copy(this.tealColor).lerp(this.violetColor, blend)
   }
 
   updateSoundTraces(history: readonly TraceEvent[]): void {
@@ -433,21 +448,15 @@ export class WorldScene {
 
   private terrainColor(height: number): THREE.Color {
     const biomes = getBiomeWeights(height)
-    const weights = [biomes.mire, biomes.forest, biomes.highlands]
-
-    // Each elevation band has its own identity; the live spectrum shifts the
-    // shared accent from glacial teal toward dreamlike violet.
-    const palettes = [
-      new THREE.Color('#174b55'), // luminous mire
-      new THREE.Color('#285b50'), // echo forest
-      new THREE.Color('#51446f'), // crystal highlands
-    ]
-    const base = palettes[0].clone().multiplyScalar(weights[0])
-      .add(palettes[1].clone().multiplyScalar(weights[1]))
-      .add(palettes[2].clone().multiplyScalar(weights[2]))
-    const spectralAccent = new THREE.Color('#287e83').lerp(new THREE.Color('#9870c7'), this.currentPaletteBlend)
-    const energyAccent = new THREE.Color('#172536').lerp(spectralAccent, 0.12 + this.currentBiomeEnergy * 0.3)
-    return base.lerp(energyAccent, 0.22 + this.currentBiomeEnergy * 0.12)
+    const base = this.terrainColorResult
+      .copy(this.terrainPalettes[0]).multiplyScalar(biomes.mire)
+      .add(this.terrainColorScratch.copy(this.terrainPalettes[1]).multiplyScalar(biomes.forest))
+      .add(this.terrainColorScratch.copy(this.terrainPalettes[2]).multiplyScalar(biomes.highlands))
+    this.terrainSpectralScratch.copy(this.terrainAccentLow).lerp(this.terrainAccentHigh, this.currentPaletteBlend)
+    this.terrainEnergyScratch.copy(this.terrainDark).lerp(
+      this.terrainSpectralScratch, 0.12 + this.currentBiomeEnergy * 0.3,
+    )
+    return base.lerp(this.terrainEnergyScratch, 0.22 + this.currentBiomeEnergy * 0.12)
   }
 
   private vertexColors(): number[] {
@@ -490,10 +499,20 @@ export class WorldScene {
     this.renderer.setSize(width, height, false)
   }
 
+  private handleVisibilityChange = (): void => {
+    if (document.hidden) {
+      if (this.frame !== 0) cancelAnimationFrame(this.frame)
+      this.frame = 0
+    } else if (!this.disposed && this.frame === 0) {
+      this.animate()
+    }
+  }
+
   private animate = (): void => {
     if (this.disposed) return
     this.frame = requestAnimationFrame(this.animate)
-    const time = performance.now() * 0.00025
+    const now = performance.now()
+    const time = now * 0.00025
     this.tealLight.position.x = -10 + Math.sin(time) * 2.2
     this.tealLight.position.z = 2 + Math.cos(time * 0.8) * 2
     this.tealLight.intensity = THREE.MathUtils.lerp(this.tealLight.intensity, this.targetTeal, 0.035)
@@ -502,7 +521,7 @@ export class WorldScene {
     this.currentPaletteBlend = THREE.MathUtils.lerp(this.currentPaletteBlend, this.targetPaletteBlend, 0.025)
     this.currentBiomeEnergy = THREE.MathUtils.lerp(this.currentBiomeEnergy, this.targetBiomeEnergy, 0.04)
     this.soundMotes.position.set(this.targetAccentX, 0.2, this.targetAccentZ)
-    this.moteMaterial.color.set('#55d6c2').lerp(new THREE.Color('#a58cff'), this.currentPaletteBlend)
+    this.moteMaterial.color.copy(this.tealColor).lerp(this.violetColor, this.currentPaletteBlend)
     this.moteMaterial.opacity = 0.08 + this.currentBiomeEnergy * 0.42 + this.currentPulse * 0.24
     this.moteMaterial.size = 0.045 + this.currentBiomeEnergy * 0.1 + this.currentPulse * 0.12
     const moteAttribute = this.soundMotes.geometry.attributes.position as THREE.BufferAttribute
@@ -527,9 +546,12 @@ export class WorldScene {
       ring.scale.setScalar(radius)
       ring.visible = this.currentPulse > 0.018
       ;(ring.material as THREE.MeshBasicMaterial).opacity = this.currentPulse * envelope * 0.58
-      ;(ring.material as THREE.MeshBasicMaterial).color.set('#55d6c2').lerp(new THREE.Color('#a58cff'), this.currentPaletteBlend)
+      ;(ring.material as THREE.MeshBasicMaterial).color.copy(this.tealColor).lerp(this.violetColor, this.currentPaletteBlend)
     })
-    if (Math.floor(performance.now() / 16) % 8 === 0) this.updateTerrainColors()
+    if (now - this.lastTerrainColorUpdate >= 120) {
+      this.updateTerrainColors()
+      this.lastTerrainColorUpdate = now
+    }
     this.water.rotation.y = Math.sin(time * 1.8) * 0.012
     const rhythmicWaterPulse = Math.max(0, Math.sin(time * 7.5)) * this.rhythmStrength * 0.32
     this.waterMaterial.emissiveIntensity = 0.24 + Math.sin(time * 2.2) * 0.08 + rhythmicWaterPulse
@@ -556,9 +578,7 @@ export class WorldScene {
     this.floatingRocks.scale.setScalar(1 + (this.soundPattern === 'accent' ? this.currentPulse * 0.045 : 0))
     const rockMaterial = this.floatingRocks.material as THREE.MeshStandardMaterial
     rockMaterial.emissiveIntensity = 0.22 + this.currentBiomeEnergy * 0.55 + this.currentPulse * 0.75
-    rockMaterial.emissive.copy(new THREE.Color('#17152b').lerp(
-      new THREE.Color('#4c3e83'), this.currentPaletteBlend,
-    ))
+    rockMaterial.emissive.copy(this.rockBaseColor).lerp(this.rockAccentColor, this.currentPaletteBlend)
     this.clouds.children.forEach(cluster => {
       const phase = Number(cluster.userData.phase) || 0
       const baseX = Number(cluster.userData.baseX) || 0
@@ -569,7 +589,7 @@ export class WorldScene {
       cluster.children.forEach(puff => {
         if (!(puff instanceof THREE.Mesh)) return
         const material = puff.material as THREE.MeshStandardMaterial
-        material.color.set('#8585ad').lerp(new THREE.Color('#8b72c8'), this.currentPaletteBlend)
+        material.color.copy(this.cloudBaseColor).lerp(this.cloudAccentColor, this.currentPaletteBlend)
         material.opacity = 0.1 + this.currentBiomeEnergy * 0.08 + this.currentPulse * 0.045
       })
     })
@@ -595,6 +615,7 @@ export class WorldScene {
     this.disposed = true
     cancelAnimationFrame(this.frame)
     window.removeEventListener('resize', this.resize)
+    document.removeEventListener('visibilitychange', this.handleVisibilityChange)
     this.controls.dispose()
     this.geometry.dispose()
     this.updateSoundTraces([])
