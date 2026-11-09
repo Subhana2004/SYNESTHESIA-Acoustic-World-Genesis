@@ -76,6 +76,8 @@ export default function App() {
     audio.current?.stop()
     audio.current = null
     lastUpdate.current = 0
+    scene.current?.resetAcousticState()
+    setSoundPattern('ambient')
     setListening(false)
     setStarting(false)
   }, [])
