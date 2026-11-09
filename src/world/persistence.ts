@@ -2,6 +2,7 @@ import type { AcousticFeatures } from '../audio/features'
 import { createTerrain, type TerrainState } from './terrain'
 import { discoverWorldLandmarks } from './discovery'
 import { deriveSoundTraces } from './soundTraces'
+import { validateWorldEvents, type WorldEvent } from './worldEvents'
 
 export interface RecordedSculpt {
   features: AcousticFeatures
@@ -20,6 +21,7 @@ export interface SavedWorld {
   heights: number[]
   history: RecordedSculpt[]
   discoveredLandmarkIds?: string[]
+  events?: WorldEvent[]
 }
 
 const DATABASE = 'synesthesia-worlds'
@@ -140,6 +142,7 @@ export async function loadWorld(id: string): Promise<SavedWorld | undefined> {
     record.discoveredLandmarkIds = Array.isArray(record.discoveredLandmarkIds)
       ? [...new Set(record.discoveredLandmarkIds.filter(id => typeof id === 'string' && allowedIds.has(id)))]
       : []
+    record.events = validateWorldEvents(record.events)
     return record
   } finally {
     db.close()
@@ -179,6 +182,7 @@ export function snapshotWorld(
     heights: Array.from(terrain.heights),
     history: history.map(item => ({ features: { ...item.features }, deltaSeconds: item.deltaSeconds })),
     discoveredLandmarkIds: [...new Set(discoveredLandmarkIds.filter(id => ['basin', 'summit', 'grove', 'echo'].includes(id)))],
+    events: [],
   }
 }
 
@@ -232,5 +236,6 @@ export function parseWorldFile(value: unknown): SavedWorld {
           typeof id === 'string' && ['basin', 'summit', 'grove', 'echo'].includes(id),
         ))]
       : [],
+    events: validateWorldEvents(record.events),
   } as SavedWorld
 }
