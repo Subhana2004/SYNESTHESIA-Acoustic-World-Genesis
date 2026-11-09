@@ -7,6 +7,7 @@ import { getBiomeWeights } from './biomes'
 import { updateSoundPattern, type SoundPattern, type SoundPatternState } from './soundPatterns'
 import { deriveSoundTraces, type TraceEvent } from './soundTraces'
 import type { WorldLandmark } from './discovery'
+import type { WorldEvent } from './worldEvents'
 
 export interface TerrainInspection { x: number; z: number; elevation: number; biome: 'mire' | 'forest' | 'highlands' }
 
@@ -57,6 +58,7 @@ export class WorldScene {
   private rhythmStrength = 0
   private traceGroup = new THREE.Group()
   private discoveryGroup = new THREE.Group()
+  private eventGroup = new THREE.Group()
   private readonly tealColor = new THREE.Color('#55d6c2')
   private readonly violetColor = new THREE.Color('#a58cff')
   private readonly rockBaseColor = new THREE.Color('#17152b')
@@ -128,6 +130,7 @@ export class WorldScene {
     this.scene.add(this.soundMotes)
     this.scene.add(this.traceGroup)
     this.scene.add(this.discoveryGroup)
+    this.scene.add(this.eventGroup)
 
     // Expanding wavefronts visualise accents at the active generation point.
     for (let i = 0; i < 3; i++) {
@@ -498,6 +501,12 @@ export class WorldScene {
   }
 
   updateDiscoveries(landmarks: readonly WorldLandmark[]): void {
+    this.eventGroup.traverse(object => {
+      if (object instanceof THREE.Mesh) {
+        object.geometry.dispose()
+        ;(object.material as THREE.Material).dispose()
+      }
+    })
     this.discoveryGroup.traverse(object => {
       if (object instanceof THREE.Mesh) {
         object.geometry.dispose()
@@ -526,6 +535,45 @@ export class WorldScene {
       marker.userData.landmarkId = landmark.id
       marker.userData.baseY = marker.position.y
       this.discoveryGroup.add(marker)
+    })
+  }
+
+
+  updateWorldEvents(events: readonly WorldEvent[]): void {
+    this.eventGroup.traverse(object => {
+      if (object instanceof THREE.Mesh) {
+        object.geometry.dispose()
+        ;(object.material as THREE.Material).dispose()
+      }
+    })
+    this.eventGroup.clear()
+    const half = this.terrain.worldWidth / 2
+    events.slice(-100).forEach((event, index) => {
+      const gx = THREE.MathUtils.clamp(Math.round((event.x + half) / this.terrain.worldWidth * (this.terrain.size - 1)), 0, this.terrain.size - 1)
+      const gz = THREE.MathUtils.clamp(Math.round((event.z + half) / this.terrain.worldWidth * (this.terrain.size - 1)), 0, this.terrain.size - 1)
+      const y = this.terrain.heights[gz * this.terrain.size + gx]
+      const color = event.kind === 'meteor-shower' ? '#f2c879'
+        : event.kind === 'aurora' ? '#a58cff'
+          : event.kind === 'echo-bloom' ? '#7ed5a8' : '#55d6c2'
+      const geometry = event.kind === 'meteor-shower'
+        ? new THREE.TorusGeometry(0.62, 0.045, 6, 28)
+        : event.kind === 'aurora'
+          ? new THREE.TorusGeometry(0.8, 0.025, 5, 36)
+          : event.kind === 'echo-bloom'
+            ? new THREE.IcosahedronGeometry(0.42, 1)
+            : new THREE.SphereGeometry(0.24, 10, 8)
+      const material = new THREE.MeshStandardMaterial({
+        color, emissive: color, emissiveIntensity: 0.7 + event.intensity * 1.2,
+        transparent: true, opacity: 0.72, roughness: 0.35,
+      })
+      const marker = new THREE.Mesh(geometry, material)
+      marker.position.set(event.x, y + 0.38 + (index % 3) * 0.08, event.z)
+      marker.rotation.x = event.kind === 'aurora' ? Math.PI / 2.8 : Math.PI / 2
+      marker.userData.baseY = marker.position.y
+      marker.userData.phase = index * 0.73
+      marker.userData.kind = event.kind
+      marker.scale.setScalar(0.8 + event.intensity * 0.45)
+      this.eventGroup.add(marker)
     })
   }
 
@@ -689,6 +737,14 @@ export class WorldScene {
       if (!(object instanceof THREE.Mesh)) return
       object.rotation.y = time * (0.42 + index * 0.08)
       object.position.y = Number(object.userData.baseY) + Math.sin(time * 1.8 + index) * 0.12
+    })
+    this.eventGroup.children.forEach(object => {
+      if (!(object instanceof THREE.Mesh)) return
+      const phase = Number(object.userData.phase) || 0
+      object.rotation.z += object.userData.kind === 'meteor-shower' ? 0.0018 : 0.0007
+      object.position.y = Number(object.userData.baseY) + Math.sin(time * 1.25 + phase) * 0.09
+      const material = object.material as THREE.MeshStandardMaterial
+      material.emissiveIntensity = 0.65 + this.currentPulse * 0.28
     })
     this.floatingRocks.rotation.y = time * (0.045 + this.rhythmStrength * 0.055)
     this.floatingRocks.scale.setScalar(1 + (this.soundPattern === 'accent' ? this.currentPulse * 0.045 : 0))
