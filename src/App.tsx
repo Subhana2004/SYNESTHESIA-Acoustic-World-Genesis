@@ -5,6 +5,7 @@ import { createTerrain, sculptTerrain } from './world/terrain'
 import { WorldScene } from './world/WorldScene'
 import { WorldMemory } from './world/WorldMemory'
 import type { RecordedSculpt } from './world/persistence'
+import type { SoundPattern } from './world/soundPatterns'
 
 const terrain = createTerrain()
 
@@ -18,6 +19,8 @@ export default function App() {
   const [error, setError] = useState('')
   const [features, setFeatures] = useState<AcousticFeatures | null>(null)
   const [updates, setUpdates] = useState(0)
+  const [soundPattern, setSoundPattern] = useState<SoundPattern>('ambient')
+  const generationProgress = Math.min(100, Math.max(0, ((terrain.frontX + terrain.worldWidth * 0.42) / (terrain.worldWidth * 0.84)) * 100))
 
   useEffect(() => {
     if (!viewport.current) return
@@ -40,7 +43,8 @@ export default function App() {
     try {
       await engine.start((f) => {
         setFeatures(f)
-        scene.current?.updateAcousticAtmosphere(mapAtmosphere(f), terrain.frontX)
+        const activePattern = scene.current?.updateAcousticAtmosphere(mapAtmosphere(f), terrain.frontX)
+        if (activePattern) setSoundPattern(current => current === activePattern ? current : activePattern)
         const now = performance.now()
         if (now - lastUpdate.current < 90) return
         const dt = lastUpdate.current === 0 ? 0.09 : (now - lastUpdate.current) / 1000
@@ -75,6 +79,7 @@ export default function App() {
     scene.current?.updateAcousticAtmosphere({ spectralBlend: 0.35, onsetPulse: 0, energy: 0, pitchTone: 0.35 }, terrain.frontX)
     setUpdates(0)
     setFeatures(null)
+    setSoundPattern('ambient')
     history.current = []
   }
 
@@ -92,13 +97,13 @@ export default function App() {
     </section>
 
     <section className="world">
-      <div className="world-head"><span>WORLD / 001</span><span className={listening ? 'live' : ''}><i /> {listening ? 'LISTENING' : 'WORLD AT REST'}</span></div>
+      <div className="world-head"><span>WORLD / 001</span><span className={listening ? 'live' : ''}><i /> {listening ? 'LISTENING' : 'WORLD AT REST'} · {soundPattern.toUpperCase()}</span></div>
       <div className="viewport" ref={viewport}>
         <div className="hint">DRAG TO ORBIT · SCROLL TO EXPLORE</div>
-        <button className="view-reset" onClick={() => scene.current?.resetCamera()} aria-label="Reset camera view">RESET VIEW</button>
+        <div className="view-controls" aria-label="Camera controls"><button className="view-reset" onClick={() => scene.current?.zoomBy(0.82)} aria-label="Zoom in">+</button><button className="view-reset" onClick={() => scene.current?.zoomBy(1.22)} aria-label="Zoom out">−</button><button className="view-reset" onClick={() => scene.current?.resetCamera()} aria-label="Reset camera view">RESET</button></div>
         <div className="coords">X {terrain.frontX.toFixed(1)} · SEED {terrain.seed}</div>
       </div>
-      <div className="world-foot"><span>AN EXPLORABLE RECORD OF YOUR SOUND</span><span>{String(updates).padStart(4, '0')} SCULPT UPDATES</span></div>
+      <div className="world-foot"><span>AN EXPLORABLE RECORD OF YOUR SOUND</span><span>{String(updates).padStart(4, '0')} SCULPT UPDATES</span></div><div className="generation-track" role="progressbar" aria-label="World generation progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(generationProgress)}><div className="generation-fill" style={{ width: generationProgress + '%' }} /></div><div className="generation-caption"><span>GENERATION FRONT</span><span>{Math.round(generationProgress)}% EXPLORED</span></div>
     </section>
 
     <section className="panel">
@@ -119,6 +124,7 @@ export default function App() {
         scene.current?.resetCamera()
         setUpdates(count)
         setFeatures(null)
+        setSoundPattern('ambient')
       }} />
       <div className="readouts" aria-live="polite">
         <div><span>FUNDAMENTAL / HZ</span><strong>{features?.pitchHz ? Math.round(features.pitchHz) : '—'}</strong><small>{features?.pitchHz ? 'CONFIDENCE ' + Math.round(features.pitchConfidence * 100) + '%' : 'NO STABLE PITCH'}</small></div>
