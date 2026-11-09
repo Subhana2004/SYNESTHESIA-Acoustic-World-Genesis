@@ -26,3 +26,5 @@ footer{display:flex;justify-content:space-between;padding:22px 0 34px;color:#6e7
 .delete-confirm{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px;border:1px solid rgba(220,130,126,.25);background:rgba(110,42,49,.1);color:#e5b6b0;font-size:11px}
 .memory-privacy{margin:0;color:#717894;font-size:7px}
 @media(max-width:520px){.world-gallery{grid-template-columns:repeat(2,minmax(0,1fr))}.world-manage-row>*{flex:1}.delete-confirm>span{width:100%}}
+
+.world-file-input{display:none}.export-action{border-color:rgba(180,164,241,.3);color:#c7baf5}
