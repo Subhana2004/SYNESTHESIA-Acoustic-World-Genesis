@@ -5,6 +5,17 @@ const tone: AcousticFeatures = { timestamp: 1, rms: 0.18, pitchHz: 220, pitchCon
 
 describe('terrain generation', () => {
   it('is repeatable for a fixed seed', () => expect(terrainChecksum(createTerrain())).toBe(terrainChecksum(createTerrain())))
+  it('creates a varied hybrid landscape with meaningful elevation range', () => {
+    const terrain = createTerrain()
+    const min = Math.min(...terrain.heights)
+    const max = Math.max(...terrain.heights)
+    expect(max - min).toBeGreaterThan(0.7)
+    expect(max).toBeGreaterThan(0.8)
+    expect(min).toBeLessThan(0.2)
+  })
+  it('changes when the seed changes', () => {
+    expect(terrainChecksum(createTerrain(81, 48, 2026))).not.toBe(terrainChecksum(createTerrain(81, 48, 2027)))
+  })
   it('preserves terrain and generation front during silence', () => {
     const t = createTerrain(), before = terrainChecksum(t), front = t.frontX
     sculptTerrain(t, { ...tone, isSilent: true, rms: 0 }, 0.1)
