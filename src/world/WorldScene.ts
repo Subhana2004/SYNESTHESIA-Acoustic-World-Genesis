@@ -7,6 +7,8 @@ import { getBiomeWeights } from './biomes'
 import { updateSoundPattern, type SoundPattern, type SoundPatternState } from './soundPatterns'
 import { deriveSoundTraces, type TraceEvent } from './soundTraces'
 
+export interface TerrainInspection { x: number; z: number; elevation: number; biome: 'mire' | 'forest' | 'highlands' }
+
 export class WorldScene {
   private renderer: THREE.WebGLRenderer
   private scene = new THREE.Scene()
@@ -14,6 +16,7 @@ export class WorldScene {
   private controls: OrbitControls
   private geometry: THREE.PlaneGeometry
   private mesh: THREE.Mesh
+  private inspectionMarker: THREE.Mesh
   private frame = 0
   private disposed = false
   private tealLight: THREE.PointLight
@@ -196,6 +199,13 @@ export class WorldScene {
       vertexColors: true, roughness: 0.88, metalness: 0.08,
     }))
     this.scene.add(this.mesh)
+    this.inspectionMarker = new THREE.Mesh(
+      new THREE.TorusGeometry(0.62, 0.035, 6, 36),
+      new THREE.MeshBasicMaterial({ color: '#f2d69a', transparent: true, opacity: 0.95 }),
+    )
+    this.inspectionMarker.rotation.x = Math.PI / 2
+    this.inspectionMarker.visible = false
+    this.scene.add(this.inspectionMarker)
     this.updateTerrain()
     this.resize()
     window.addEventListener('resize', this.resize)
@@ -484,6 +494,40 @@ export class WorldScene {
     return colors
   }
 
+  inspectAt(clientX: number, clientY: number): TerrainInspection | null {
+    const rect = this.renderer.domElement.getBoundingClientRect()
+    const pointer = new THREE.Vector2(
+      ((clientX - rect.left) / rect.width) * 2 - 1,
+      -((clientY - rect.top) / rect.height) * 2 + 1,
+    )
+    const raycaster = new THREE.Raycaster()
+    raycaster.setFromCamera(pointer, this.camera)
+    const hit = raycaster.intersectObject(this.mesh, false)[0]
+    return hit ? this.inspectWorldPoint(hit.point.x, hit.point.z) : null
+  }
+
+  inspectWorldPoint(x: number, z: number): TerrainInspection {
+    const half = this.terrain.worldWidth / 2
+    const worldX = THREE.MathUtils.clamp(x, -half, half)
+    const worldZ = THREE.MathUtils.clamp(z, -half, half)
+    const step = this.terrain.worldWidth / (this.terrain.size - 1)
+    const gx = Math.round((worldX + half) / step)
+    const gz = Math.round((worldZ + half) / step)
+    const elevation = this.terrain.heights[gz * this.terrain.size + gx]
+    const weights = getBiomeWeights(elevation)
+    const biome = weights.highlands >= weights.forest && weights.highlands >= weights.mire
+      ? 'highlands'
+      : weights.forest >= weights.mire ? 'forest' : 'mire'
+    this.inspectionMarker.position.set(worldX, elevation + 0.12, worldZ)
+    this.inspectionMarker.visible = true
+    const target = new THREE.Vector3(worldX, elevation, worldZ)
+    const cameraOffset = this.camera.position.clone().sub(this.controls.target)
+    this.controls.target.copy(target)
+    this.camera.position.copy(target).add(cameraOffset)
+    this.controls.update()
+    return { x: worldX, z: worldZ, elevation, biome }
+  }
+
   updateTerrain(): void {
     const positions = this.geometry.attributes.position as THREE.BufferAttribute
     const colors = this.geometry.attributes.color as THREE.BufferAttribute
@@ -634,6 +678,8 @@ export class WorldScene {
     document.removeEventListener('visibilitychange', this.handleVisibilityChange)
     this.controls.dispose()
     this.geometry.dispose()
+    this.inspectionMarker.geometry.dispose()
+    ;(this.inspectionMarker.material as THREE.Material).dispose()
     this.updateSoundTraces([])
     this.water.geometry.dispose()
     this.soundMotes.geometry.dispose()
