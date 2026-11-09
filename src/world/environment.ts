@@ -42,9 +42,9 @@ function createRandom(seed: number): () => number {
   }
 }
 
-function sampleHeight(terrain: TerrainState, x: number, z: number): number {
+export function sampleTerrainHeight(terrain: TerrainState, x: number, z: number): number {
   const col = Math.round((x / terrain.worldWidth + 0.5) * (terrain.size - 1))
-  const row = Math.round((0.5 - z / terrain.worldWidth) * (terrain.size - 1))
+  const row = Math.round((z / terrain.worldWidth + 0.5) * (terrain.size - 1))
   const safeCol = Math.max(0, Math.min(terrain.size - 1, col))
   const safeRow = Math.max(0, Math.min(terrain.size - 1, row))
   return terrain.heights[safeRow * terrain.size + safeCol]
@@ -61,7 +61,7 @@ export function generateEnvironmentLayout(terrain: TerrainState): EnvironmentLay
     const z = (random() * 2 - 1) * half * 0.94
     // Keep the reflective basin open; crystal growths are allowed on high ridges.
     if (Math.hypot(x - terrain.worldWidth * 0.06, z - terrain.worldWidth * 0.04) < 5.1) continue
-    const y = sampleHeight(terrain, x, z)
+    const y = sampleTerrainHeight(terrain, x, z)
     if (y < 0.08 || y > 3.2) continue
     const weights = getBiomeWeights(y)
     const biome: BiomeKind = weights.mire >= weights.forest && weights.mire >= weights.highlands
