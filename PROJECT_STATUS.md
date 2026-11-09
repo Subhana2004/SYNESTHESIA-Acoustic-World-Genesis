@@ -7,10 +7,10 @@ Last updated: 2026-11-10
 | Milestone | Status | Evidence / notes |
 |---|---|---|
 | M0 — Architecture and feasibility | In progress | Architecture and risk decisions documented in ARCHITECTURE.md |
-| M1 — Audio foundation | In progress | Browser microphone capture and initial feature extraction scaffolded |
-| M2 — Acoustic terrain genesis | In progress | Bounded moving-front heightfield sculpting scaffolded |
-| M3 — Persistence and replay | Not started | IndexedDB and deterministic feature-stream replay remain outstanding |
-| M4 — Environment construction | Not started | Materials, vegetation, water, clouds and biomes remain outstanding |
+| M1 — Audio foundation | In progress | Browser microphone capture and initial feature extraction scaffolded; automated verification still needs confirmation |
+| M2 — Acoustic terrain genesis | Design specified; implementation in progress | Product direction and acceptance criteria recorded in M2_DESIGN.md; bounded moving-front heightfield sculpting is scaffolded |
+| M3 — Persistence and replay | Not started | Durable IndexedDB save/load and deterministic feature-stream replay remain outstanding |
+| M4 — Environment construction | Not started | Extended materials, vegetation, water, clouds and biomes remain outstanding |
 | M5 — Visual and interaction refinement | Not started | Accessibility, responsive controls and performance profiling remain outstanding |
 | M6 — Integration and validation | Not started | Full browser/device validation remains outstanding |
 
@@ -24,9 +24,18 @@ The initial branch contains a first end-to-end prototype:
 - Three.js terrain rendering and orbit-style camera controls.
 - Unit tests for core mapping and terrain behavior.
 
+## M2 visual and behaviour decisions
+
+See M2_DESIGN.md for the full design and acceptance criteria.
+
+- Terrain direction: hybrid natural landforms with restrained surreal details.
+- Atmosphere: dark, cinematic palette with selective teal, violet and moonlit accents.
+- Behaviour: terrain evolves during live sound input and remains intact when input pauses; subtle ambient motion may continue independently.
+- Persistence boundary: durable save/load across browser sessions is M3, not yet implemented.
+
 ## Verification status
 
-No build, unit test, browser test, or target-device performance result is claimed as passing until it has actually been run. This repository change is an implementation checkpoint; execute the commands in README.md locally and update this file with observed results.
+No build, unit test, browser test, or target-device performance result is claimed as passing until it has actually been run. This repository change is a design checkpoint; execute the commands in README.md and update this file with observed results.
 
 ## Known limitations
 
@@ -39,8 +48,8 @@ No build, unit test, browser test, or target-device performance result is claime
 
 ## Next steps
 
-1. Install dependencies and run build + tests.
-2. Validate pitch behavior with synthetic sine, noise, and silence fixtures.
-3. Test microphone permissions and lifecycle in Chromium.
-4. Tune brush radius, front speed, and acoustic response using real users.
-5. Introduce deterministic feature-stream recording and persistence only after the world-state format stabilizes.
+1. Confirm the M1 build and test pipeline with an actual successful run.
+2. Improve broad landform generation and bounded acoustic sculpting against the M2 design.
+3. Apply the dark material, lighting and fog direction.
+4. Verify pause/silence preservation, reset determinism and ambient motion.
+5. Stabilise the world-state schema before M3 persistence and replay.
