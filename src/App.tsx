@@ -28,7 +28,7 @@ export default function App() {
     audio.current = null
     setListening(false)
   }, [])
-  useEffect(() => () => audio.current?.stop(), [])
+  useEffect(() => () => { audio.current?.stop() }, [])
 
   const start = async () => {
     setError('')
