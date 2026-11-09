@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
+import type { AtmosphereControls } from '../audio/features'
 import type { TerrainState } from './terrain'
 
 export class WorldScene {
@@ -12,6 +13,14 @@ export class WorldScene {
   private frame = 0
   private disposed = false
   private tealLight: THREE.PointLight
+  private violetLight: THREE.PointLight
+  private accentLight: THREE.PointLight
+  private targetTeal = 0.55
+  private targetViolet = 0.35
+  private targetPulse = 0
+  private currentPulse = 0
+  private targetAccentX = 0
+  private targetAccentZ = 0
 
   constructor(private host: HTMLDivElement, private terrain: TerrainState) {
     this.scene.background = new THREE.Color('#080a12')
@@ -34,12 +43,15 @@ export class WorldScene {
     const moon = new THREE.DirectionalLight('#c4c9e8', 1.55)
     moon.position.set(-18, 30, 12)
     this.scene.add(moon)
-    this.tealLight = new THREE.PointLight('#55d6c2', 18, 38, 2)
+    this.tealLight = new THREE.PointLight('#55d6c2', 0, 38, 2)
     this.tealLight.position.set(-10, 5, 2)
     this.scene.add(this.tealLight)
-    const violetLight = new THREE.PointLight('#9b7bff', 11, 34, 2)
-    violetLight.position.set(12, 4, -12)
-    this.scene.add(violetLight)
+    this.violetLight = new THREE.PointLight('#9b7bff', 0, 34, 2)
+    this.violetLight.position.set(12, 4, -12)
+    this.scene.add(this.violetLight)
+    this.accentLight = new THREE.PointLight('#55d6c2', 0, 18, 2)
+    this.accentLight.position.set(0, 2.5, 0)
+    this.scene.add(this.accentLight)
 
     this.geometry = new THREE.PlaneGeometry(terrain.worldWidth, terrain.worldWidth, terrain.size - 1, terrain.size - 1)
     this.geometry.rotateX(-Math.PI / 2)
@@ -52,6 +64,18 @@ export class WorldScene {
     this.resize()
     window.addEventListener('resize', this.resize)
     this.animate()
+  }
+
+  updateAcousticAtmosphere(controls: AtmosphereControls, frontX: number): void {
+    const blend = THREE.MathUtils.clamp(controls.spectralBlend, 0, 1)
+    const energy = THREE.MathUtils.clamp(controls.energy, 0, 1)
+    this.targetTeal = 0.18 + (1 - blend) * 1.15 + energy * 0.35
+    this.targetViolet = 0.18 + blend * 1.2 + energy * 0.25
+    this.targetPulse = Math.max(this.targetPulse, THREE.MathUtils.clamp(controls.onsetPulse, 0, 1))
+    this.targetAccentX = THREE.MathUtils.clamp(frontX, -this.terrain.worldWidth / 2, this.terrain.worldWidth / 2)
+    this.targetAccentZ = Math.sin((this.targetAccentX + this.terrain.worldWidth / 2) * 0.11) * 2.5
+    const accentColor = new THREE.Color('#55d6c2').lerp(new THREE.Color('#9b7bff'), blend)
+    this.accentLight.color.copy(accentColor)
   }
 
   private terrainColor(height: number): THREE.Color {
@@ -101,6 +125,12 @@ export class WorldScene {
     const time = performance.now() * 0.00025
     this.tealLight.position.x = -10 + Math.sin(time) * 2.2
     this.tealLight.position.z = 2 + Math.cos(time * 0.8) * 2
+    this.tealLight.intensity = THREE.MathUtils.lerp(this.tealLight.intensity, this.targetTeal, 0.035)
+    this.violetLight.intensity = THREE.MathUtils.lerp(this.violetLight.intensity, this.targetViolet, 0.035)
+    this.currentPulse = THREE.MathUtils.lerp(this.currentPulse, this.targetPulse, 0.22)
+    this.targetPulse *= 0.9
+    this.accentLight.intensity = this.currentPulse * 5.5
+    this.accentLight.position.set(this.targetAccentX, 2.5, this.targetAccentZ)
     this.controls.update()
     this.renderer.render(this.scene, this.camera)
   }
