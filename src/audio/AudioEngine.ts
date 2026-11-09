@@ -6,6 +6,7 @@ export class AudioEngine {
   private analyser: AnalyserNode | null = null
   private frameId = 0
   private previousRms = 0
+  private lastAnalysisAt = 0
   private timeData: Float32Array | null = null
   private frequencyData: Uint8Array | null = null
 
@@ -23,8 +24,13 @@ export class AudioEngine {
     this.timeData = new Float32Array(this.analyser.fftSize)
     this.frequencyData = new Uint8Array(this.analyser.frequencyBinCount)
 
-    const sample = () => {
+    const sample = (now: number) => {
       if (!this.analyser || !this.context || !this.timeData || !this.frequencyData) return
+      if (now - this.lastAnalysisAt < 50) {
+        this.frameId = requestAnimationFrame(sample)
+        return
+      }
+      this.lastAnalysisAt = now
       this.analyser.getFloatTimeDomainData(this.timeData)
       this.analyser.getByteFrequencyData(this.frequencyData)
       const f = extractFeatures(this.timeData, this.frequencyData, this.context.sampleRate, this.previousRms)
@@ -45,5 +51,6 @@ export class AudioEngine {
     this.timeData = null
     this.frequencyData = null
     this.previousRms = 0
+    this.lastAnalysisAt = 0
   }
 }
