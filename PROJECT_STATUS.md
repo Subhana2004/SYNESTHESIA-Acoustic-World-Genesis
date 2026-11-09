@@ -47,7 +47,8 @@ The current branch contains a first end-to-end prototype with M4 environmental c
 - M5.1 reduces per-frame and terrain-colour allocations by reusing Three.js colour objects, batches sound landmarks into at most three instanced meshes, limits terrain palette refresh to 120 ms intervals, caps renderer pixel ratio at 1.25, and pauses the animation loop while the document is hidden. Browser/device performance profiling remains outstanding.
 - M5.2 adds a live sound-pattern label, a generation-front progress bar, zoom-in/zoom-out/reset camera controls, and microphone-startup feedback. Sound-pattern state is exposed by WorldScene and reflected in the React interface. CI passed at commit a9c5ef0.
 - M5.3 adds terrain ray-picking with a selected-location marker, biome/elevation field notes, nearby acoustic landmark identification, and a clickable 25×25 biome minimap that focuses the camera. CI passed at commit a0c797d.
-- M5.4 derives named landmarks from terrain extrema, forest-rich regions and distinct acoustic traces; adds animated 3D landmark markers, minimap discovery markers and a field journal that records discoveries during the active session. Discovery is currently session-scoped and resets when a different world is loaded; persistent per-world discovery history is a later enhancement.
+- M5.4 derives named landmarks from terrain extrema, forest-rich regions and distinct acoustic traces; adds animated 3D landmark markers, minimap discovery markers and a field journal.
+- M5.5 stores discovered landmark IDs in each saved world and portable export/import file, restores them on load and replay, and calculates per-world exploration completion for gallery cards. Older saved-world files without discovery data remain compatible. Browser validation remains outstanding.
 
 ## M2 visual and behaviour decisions
 
@@ -60,7 +61,7 @@ See M2_DESIGN.md for the full design and acceptance criteria.
 
 ## Verification status
 
-GitHub Actions passed unit tests and the production build for M4.6 at commit e05f6e1, M4.7 sound-mote changes at commit b765a09, M5.1 at commit e8d219a, and M5.2 at commit a9c5ef0, and M5.3 at commit a0c797d. M5.4 discovery-journal changes are committed and awaiting CI. Browser microphone/rendering checks, IndexedDB save/reload validation and target-device profiling remain outstanding.
+GitHub Actions passed unit tests and the production build for M4.6 at commit e05f6e1, M4.7 sound-mote changes at commit b765a09, M5.1 at commit e8d219a, and M5.2 at commit a9c5ef0, and M5.3 at commit a0c797d, and M5.4 at commit bc7c475. M5.5 per-world exploration persistence is committed and awaiting CI. Browser microphone/rendering checks, IndexedDB save/reload validation and target-device profiling remain outstanding.
 
 ## Known limitations
 
