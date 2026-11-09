@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { parseWorldFile, snapshotWorld } from './persistence'
 import { createTerrain } from './terrain'
+import { createWorldEvent } from './worldEvents'
 
 const world = {
   id: 'original-id',
@@ -68,6 +69,15 @@ describe('portable world files', () => {
   it('includes discoveries in a new world snapshot', () => {
     const snapshot = snapshotWorld(createTerrain(), 'Test world', [], ['summit', 'echo', 'summit'])
     expect(snapshot.discoveredLandmarkIds).toEqual(['summit', 'echo'])
+  })
+
+  it('preserves a validated event journal when importing a world', () => {
+    const event = createWorldEvent(createTerrain(), {
+      timestamp: 1234, rms: 0.2, pitchHz: 520, pitchConfidence: 0.9,
+      spectralCentroidHz: 1800, onsetStrength: 0.9, isSilent: false,
+    }, 'accent', 3)!
+    const imported = parseWorldFile(file({ ...world, events: [event, { ...event, intensity: 4 }] }))
+    expect(imported.events).toEqual([event])
   })
 
 })
