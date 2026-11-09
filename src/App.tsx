@@ -150,6 +150,7 @@ export default function App() {
     terrain.seed = fresh.seed
     lastUpdate.current = 0
     scene.current?.rebuildWorldEnvironment()
+    scene.current?.resetAcousticState()
     scene.current?.updateTerrain()
     scene.current?.clearInspection()
     scene.current?.updateSoundTraces([])
@@ -164,6 +165,7 @@ export default function App() {
     eventSequence.current = 0
     lastWorldEventAt.current = 0
     setWorldEvents([])
+    setShowAllEvents(false)
     scene.current?.updateWorldEvents([])
     const initialLandmarks = discoverWorldLandmarks(terrain)
     setLandmarks(initialLandmarks)
@@ -245,6 +247,7 @@ export default function App() {
       </div>
       <WorldMemory terrain={terrain} history={history} discoveredIds={discoveredIds} events={worldEvents} stop={stop} onWorldChange={(count, restoredDiscoveredIds = [], restoredEvents = []) => {
         scene.current?.rebuildWorldEnvironment()
+        scene.current?.resetAcousticState()
         scene.current?.clearInspection()
         scene.current?.updateSoundTraces(history.current)
         scene.current?.updateAcousticAtmosphere({ spectralBlend: 0.35, onsetPulse: 0, energy: 0, pitchTone: 0.35 }, terrain.frontX)
@@ -259,6 +262,7 @@ export default function App() {
         eventSequence.current = restoredEvents.reduce((max, event) => Math.max(max, Number(event.id.split('-').slice(-1)[0]) || 0), 0)
         lastWorldEventAt.current = performance.now()
         setWorldEvents(restoredEvents)
+        setShowAllEvents(false)
         scene.current?.updateWorldEvents(restoredEvents)
         const restoredLandmarks = discoverWorldLandmarks(terrain, deriveSoundTraces(terrain, history.current))
         setLandmarks(restoredLandmarks)
