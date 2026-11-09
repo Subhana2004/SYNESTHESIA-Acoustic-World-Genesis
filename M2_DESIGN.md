@@ -6,7 +6,7 @@ M2 turns the M0/M1 acoustic-to-heightfield prototype into a recognisable SYNESTH
 
 The world should feel explorable rather than like a flat audio visualizer. Mountains, valleys, ridges, plains and basins provide geographic readability. Surreal silhouettes, luminous accents, fog and restrained environmental motion make the landscape feel dreamlike without losing its natural structure.
 
-This is a design specification. It does not claim that the visual systems or durable save/load are already implemented.
+This document records the original design intent and acceptance criteria. The implementation has since progressed through M5; see PROJECT_STATUS.md for current delivery and validation status.
 
 ## 2. Visual direction
 
@@ -75,8 +75,9 @@ A sound-created landform is part of the world, not a temporary waveform. Therefo
 - Transient signal values (current RMS, pitch and centroid) are not themselves persistent world data.
 - The world state should be serialisable independently of the renderer.
 - A stable world identity should include a seed, schema version and mapping configuration.
-- Durable save/load across browser sessions belongs to M3, using a versioned representation (seed + terrain state + relevant settings), preferably in IndexedDB.
-- M2 should keep the terrain data model deterministic and serialisation-friendly, but must not imply that cross-session persistence exists until M3 is implemented and tested.
+- Durable save/load is implemented in M3 using versioned world snapshots in IndexedDB, including seed, terrain state, acoustic feature history, discovered landmarks and derived world events.
+- Portable JSON import/export provides transfer between browser profiles; cloud sync is not implemented.
+- The persistence boundary is browser-local and does not store microphone recordings.
 
 ### 3.3 Reset and future history
 
@@ -139,7 +140,7 @@ M2 is complete when:
 
 ## 8. Out of scope for M2
 
-- Cross-session IndexedDB save/load, import/export and replay (M3).
+- Cross-session IndexedDB save/load, import/export and replay were delivered in M3; they are no longer out of scope for the current application.
 - Full biome simulation, complex vegetation, realistic water and weather systems (later environment milestone).
 - AI interpretation of speech or semantic sound labels.
 - Multiplayer or shared worlds.
@@ -150,4 +151,4 @@ M2 is complete when:
 - Terrain style: **Hybrid natural + surreal**.
 - Atmosphere: **Dark, cinematic, atmospheric**.
 - World behaviour: **Both live-evolving and persistent**.
-- Persistence boundary: **In-session terrain preservation is required in M2; durable browser-session persistence is planned for M3**.
+- Persistence boundary: **In-session terrain preservation is required in M2; durable browser-session persistence, replay and portable import/export were delivered in M3.**
