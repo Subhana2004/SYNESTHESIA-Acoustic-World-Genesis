@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type MutableRefObject } from 'react'
 import { deleteWorld, listSavedWorlds, loadWorld, renameWorld, restoreWorld, saveWorld, snapshotWorld, parseWorldFile, type RecordedSculpt, type SavedWorldSummary } from './persistence'
 import { replayTerrain, type TerrainState } from './terrain'
 
-type Props = { terrain: TerrainState; history: MutableRefObject<RecordedSculpt[]>; discoveredIds: string[]; stop: () => void; onWorldChange: (count: number, discoveredIds?: string[]) => void }
+type Props = { terrain: TerrainState; history: MutableRefObject<RecordedSculpt[]>; discoveredIds: string[]; events: import('./worldEvents').WorldEvent[]; stop: () => void; onWorldChange: (count: number, discoveredIds?: string[], events?: import('./worldEvents').WorldEvent[]) => void }
 
 function WorldPreview({ values }: { values: number[] }) {
   const min = Math.min(...values)
@@ -18,7 +18,7 @@ function WorldPreview({ values }: { values: number[] }) {
   </svg>
 }
 
-export function WorldMemory({ terrain, history, discoveredIds, stop, onWorldChange }: Props) {
+export function WorldMemory({ terrain, history, discoveredIds, events, stop, onWorldChange }: Props) {
   const [worlds, setWorlds] = useState<SavedWorldSummary[]>([])
   const [selected, setSelected] = useState('')
   const [busy, setBusy] = useState(false)
@@ -34,7 +34,7 @@ export function WorldMemory({ terrain, history, discoveredIds, stop, onWorldChan
   const save = async () => {
     stop(); setBusy(true); setMessage('')
     try {
-      const record = snapshotWorld(terrain, 'World ' + new Date().toLocaleString(), history.current, discoveredIds)
+      const record = snapshotWorld(terrain, 'World ' + new Date().toLocaleString(), history.current, discoveredIds, events)
       await saveWorld(record); await refresh(); setSelected(record.id); setRenameValue(record.name)
       setMessage('World saved in this browser.')
     } catch (e) { setMessage(e instanceof Error ? e.message : 'Could not save this world.') }
@@ -49,7 +49,7 @@ export function WorldMemory({ terrain, history, discoveredIds, stop, onWorldChan
       if (!record) throw new Error('Saved world not found.')
       restoreWorld(terrain, record)
       history.current = record.history.map(item => ({ features: { ...item.features }, deltaSeconds: item.deltaSeconds }))
-      onWorldChange(record.history.length, record.discoveredLandmarkIds ?? []); setMessage(`“${record.name}” restored with ${record.discoveredLandmarkIds?.length ?? 0} discoveries.`)
+      onWorldChange(record.history.length, record.discoveredLandmarkIds ?? [], record.events ?? []); setMessage(`“${record.name}” restored with ${record.discoveredLandmarkIds?.length ?? 0} discoveries.`)
     } catch (e) { setMessage(e instanceof Error ? e.message : 'Could not load this world.') }
     finally { setBusy(false) }
   }
@@ -60,7 +60,7 @@ export function WorldMemory({ terrain, history, discoveredIds, stop, onWorldChan
     const replayed = replayTerrain(terrain.seed, terrain.size, terrain.worldWidth, events)
     terrain.heights.set(replayed.heights)
     terrain.frontX = replayed.frontX
-    onWorldChange(events.length, discoveredIds)
+    onWorldChange(events.length, discoveredIds, events)
     setMessage('Creation replayed from the recorded acoustic feature stream.')
   }
 
