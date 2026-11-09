@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { parseWorldFile } from './persistence'
+import { parseWorldFile, snapshotWorld } from './persistence'
+import { createTerrain } from './terrain'
 
 const world = {
   id: 'original-id',
@@ -54,4 +55,19 @@ describe('portable world files', () => {
   it('rejects oversized histories', () => {
     expect(() => parseWorldFile(file({ ...world, history: Array(20001).fill(world.history[0]) }))).toThrow('invalid terrain data')
   })
+  it('preserves discovered landmark ids in portable world files', () => {
+    const imported = parseWorldFile(file({ ...world, discoveredLandmarkIds: ['basin', 'grove', 'basin', 'unknown'] }))
+    expect(imported.discoveredLandmarkIds).toEqual(['basin', 'grove'])
+  })
+
+  it('defaults older world files to an empty discovery record', () => {
+    const imported = parseWorldFile(file(world))
+    expect(imported.discoveredLandmarkIds).toEqual([])
+  })
+
+  it('includes discoveries in a new world snapshot', () => {
+    const snapshot = snapshotWorld(createTerrain(), 'Test world', [], ['summit', 'echo', 'summit'])
+    expect(snapshot.discoveredLandmarkIds).toEqual(['summit', 'echo'])
+  })
+
 })
