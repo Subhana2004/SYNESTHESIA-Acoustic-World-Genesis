@@ -203,7 +203,7 @@ export class WorldScene {
     this.animate()
   }
 
-  updateAcousticAtmosphere(controls: AtmosphereControls, frontX: number): void {
+  updateAcousticAtmosphere(controls: AtmosphereControls, frontX: number): SoundPattern {
     const blend = THREE.MathUtils.clamp(controls.spectralBlend, 0, 1)
     this.targetPaletteBlend = blend
     this.targetPitchTone = THREE.MathUtils.clamp(controls.pitchTone, 0, 1)
@@ -221,6 +221,14 @@ export class WorldScene {
     this.targetAccentX = THREE.MathUtils.clamp(frontX, -this.terrain.worldWidth / 2, this.terrain.worldWidth / 2)
     this.targetAccentZ = Math.sin((this.targetAccentX + this.terrain.worldWidth / 2) * 0.11) * 2.5
     this.accentLight.color.copy(this.tealColor).lerp(this.violetColor, blend)
+    return this.soundPattern
+  }
+
+  zoomBy(factor: number): void {
+    const offset = this.camera.position.clone().sub(this.controls.target)
+    const distance = THREE.MathUtils.clamp(offset.length() * factor, this.controls.minDistance, this.controls.maxDistance)
+    this.camera.position.copy(this.controls.target).add(offset.normalize().multiplyScalar(distance))
+    this.controls.update()
   }
 
   updateSoundTraces(history: readonly TraceEvent[]): void {
