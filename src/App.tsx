@@ -240,7 +240,7 @@ export default function App() {
         setNearbyTrace(null)
         setDiscoveredIds(restoredDiscoveredIds)
         eventHistory.current = restoredEvents
-        eventSequence.current = restoredEvents.reduce((max, event) => Math.max(max, Number(event.id.split('-').at(-1)) || 0), 0)
+        eventSequence.current = restoredEvents.reduce((max, event) => Math.max(max, Number(event.id.split('-').slice(-1)[0]) || 0), 0)
         lastWorldEventAt.current = performance.now()
         setWorldEvents(restoredEvents)
         scene.current?.updateWorldEvents(restoredEvents)
