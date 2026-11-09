@@ -25,6 +25,9 @@ The current branch contains a first end-to-end prototype and the first M2 visual
 - Dark navy/purple scene palette, distance fog, cool directional lighting and restrained teal/violet atmospheric lights.
 - Spectral centroid mapped to a teal-to-violet lighting balance.
 - Onset strength mapped to a short-lived accent-light pulse near the current generation front.
+- Seeded drifting valley mist rendered as a lightweight point cloud.
+- A restrained star field and emissive teal/violet mineral spires placed on elevated terrain.
+- Environmental motion continues independently of microphone input; terrain geometry is not changed by these ambient effects.
 - Dark application interface to match the in-world visual direction.
 - Unit tests for core mapping, terrain behaviour and bounded atmospheric controls.
 
@@ -39,7 +42,7 @@ See M2_DESIGN.md for the full design and acceptance criteria.
 
 ## Verification status
 
-The previous CI run showed that unit tests passed but TypeScript production build failed due to incompatible Vite plugin type identities. The configuration has been adjusted at the plugin boundary. A new CI run is in progress; do not treat the build as passing until GitHub Actions reports success. Browser microphone/rendering checks and target-device profiling remain outstanding.
+GitHub Actions reported successful unit-test and production-build runs for the sound-reactive atmosphere changes (commit e300b403). The environmental mist, stars and ridge-crystal changes were committed afterward, so their own CI verification is still pending. Browser microphone/rendering checks and target-device profiling remain outstanding. Browser microphone/rendering checks and target-device profiling remain outstanding.
 
 ## Known limitations
 
@@ -48,12 +51,13 @@ The previous CI run showed that unit tests passed but TypeScript production buil
 - The first renderer updates a single heightfield mesh; large worlds need chunking and profiling.
 - Save/load, import/export, undo, and replay are not implemented yet.
 - Atmospheric response currently drives lights rather than persistent terrain materials.
-- Current ambient motion is deliberately restrained; richer environmental animation is still future work.
+- Mist, stars and ridge crystals are a first lightweight environmental pass; density, visibility and performance still need browser review.
 - No AI/ML model is required or included in this first version.
 
 ## Next steps
 
 1. Confirm the M2 build and test pipeline with a successful CI run.
-2. Inspect and tune spectral lighting and onset accents in a real browser with live microphone input.
-3. Verify pause/silence preservation, reset determinism and ambient motion.
-4. Stabilise the world-state schema before M3 persistence and replay.
+2. Confirm CI for the mist, stars and ridge-crystal implementation.
+3. Inspect environmental density, camera visibility and performance in a real browser.
+4. Verify pause/silence preservation, reset determinism and ambient motion.
+5. Stabilise the world-state schema before M3 persistence and replay.
