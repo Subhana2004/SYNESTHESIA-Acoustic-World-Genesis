@@ -1,5 +1,7 @@
 import type { AcousticFeatures } from '../audio/features'
-import type { TerrainState } from './terrain'
+import { createTerrain, type TerrainState } from './terrain'
+import { discoverWorldLandmarks } from './discovery'
+import { deriveSoundTraces } from './soundTraces'
 
 export interface RecordedSculpt {
   features: AcousticFeatures
@@ -17,6 +19,7 @@ export interface SavedWorld {
   frontX: number
   heights: number[]
   history: RecordedSculpt[]
+  discoveredLandmarkIds?: string[]
 }
 
 const DATABASE = 'synesthesia-worlds'
@@ -68,6 +71,9 @@ export interface SavedWorldSummary {
   seed: number
   preview: number[]
   sculptCount: number
+  discoveredCount: number
+  landmarkCount: number
+  explorationPercent: number
 }
 
 export async function listSavedWorlds(): Promise<SavedWorldSummary[]> {
@@ -79,7 +85,19 @@ export async function listSavedWorlds(): Promise<SavedWorldSummary[]> {
       const stride = Math.max(1, Math.floor(record.size / 40))
       const preview = Array.from({ length: Math.ceil(record.size / stride) }, (_, index) =>
         record.heights[row + Math.min(record.size - 1, index * stride)] ?? 0)
-      return { id: record.id, name: record.name, savedAt: record.savedAt, seed: record.seed, preview, sculptCount: record.history.length }
+      const terrain = createTerrain(record.size, record.worldWidth, record.seed)
+      terrain.heights.set(record.heights)
+      terrain.frontX = record.frontX
+      const traces = deriveSoundTraces(terrain, record.history)
+      const landmarks = discoverWorldLandmarks(terrain, traces)
+      const discovered = new Set(Array.isArray(record.discoveredLandmarkIds) ? record.discoveredLandmarkIds : [])
+      const discoveredCount = landmarks.filter(item => discovered.has(item.id)).length
+      return {
+        id: record.id, name: record.name, savedAt: record.savedAt, seed: record.seed,
+        preview, sculptCount: record.history.length, discoveredCount,
+        landmarkCount: landmarks.length,
+        explorationPercent: landmarks.length ? Math.round(discoveredCount / landmarks.length * 100) : 0,
+      }
     }).sort((a, b) => b.savedAt - a.savedAt)
   } finally {
     db.close()
@@ -118,6 +136,10 @@ export async function loadWorld(id: string): Promise<SavedWorld | undefined> {
         Number.isFinite(item.features.rms) && Number.isFinite(item.features.timestamp))) {
       throw new Error('This saved world is invalid or uses an unsupported format.')
     }
+    const allowedIds = new Set(['basin', 'summit', 'grove', 'echo'])
+    record.discoveredLandmarkIds = Array.isArray(record.discoveredLandmarkIds)
+      ? [...new Set(record.discoveredLandmarkIds.filter(id => typeof id === 'string' && allowedIds.has(id)))]
+      : []
     return record
   } finally {
     db.close()
@@ -143,6 +165,7 @@ export function snapshotWorld(
   terrain: TerrainState,
   name: string,
   history: RecordedSculpt[],
+  discoveredLandmarkIds: string[] = [],
 ): SavedWorld {
   return {
     id: globalThis.crypto?.randomUUID?.() ?? `world-${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -155,6 +178,7 @@ export function snapshotWorld(
     frontX: terrain.frontX,
     heights: Array.from(terrain.heights),
     history: history.map(item => ({ features: { ...item.features }, deltaSeconds: item.deltaSeconds })),
+    discoveredLandmarkIds: [...new Set(discoveredLandmarkIds.filter(id => ['basin', 'summit', 'grove', 'echo'].includes(id)))],
   }
 }
 
@@ -203,5 +227,10 @@ export function parseWorldFile(value: unknown): SavedWorld {
     version: 1,
     heights: [...record.heights],
     history: record.history.map(item => ({ features: { ...item.features }, deltaSeconds: item.deltaSeconds })),
+    discoveredLandmarkIds: Array.isArray(record.discoveredLandmarkIds)
+      ? [...new Set(record.discoveredLandmarkIds.filter(id =>
+          typeof id === 'string' && ['basin', 'summit', 'grove', 'echo'].includes(id),
+        ))]
+      : [],
   } as SavedWorld
 }
