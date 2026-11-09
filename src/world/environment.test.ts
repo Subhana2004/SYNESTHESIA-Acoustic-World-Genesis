@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createTerrain } from './terrain'
-import { generateEnvironmentLayout } from './environment'
+import { generateEnvironmentLayout, sampleTerrainHeight } from './environment'
 import { getBiomeWeights } from './biomes'
 
 describe('procedural environment layout', () => {
