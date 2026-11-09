@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createTerrain, sculptTerrain, terrainChecksum } from './terrain'
+import { createTerrain, replayTerrain, sculptTerrain, terrainChecksum } from './terrain'
 import type { AcousticFeatures } from '../audio/features'
 const tone: AcousticFeatures = { timestamp: 1, rms: 0.18, pitchHz: 220, pitchConfidence: 0.95, spectralCentroidHz: 800, onsetStrength: 0.2, isSilent: false }
 
@@ -21,6 +21,14 @@ describe('terrain generation', () => {
     sculptTerrain(t, { ...tone, isSilent: true, rms: 0 }, 0.1)
     expect(terrainChecksum(t)).toBe(before)
     expect(t.frontX).toBe(front)
+  })
+  it('replays the same acoustic history deterministically', () => {
+    const original = createTerrain()
+    const history = Array.from({ length: 30 }, () => ({ features: tone, deltaSeconds: 0.09 }))
+    history.forEach(event => sculptTerrain(original, event.features, event.deltaSeconds))
+    const replayed = replayTerrain(original.seed, original.size, original.worldWidth, history)
+    expect(terrainChecksum(replayed)).toBe(terrainChecksum(original))
+    expect(replayed.frontX).toBe(original.frontX)
   })
   it('sculpts bounded geometry for an active tone', () => {
     const t = createTerrain(), before = terrainChecksum(t)
