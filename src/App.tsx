@@ -87,6 +87,7 @@ export default function App() {
       <div className="world-head"><span>WORLD / 001</span><span className={listening ? 'live' : ''}><i /> {listening ? 'LISTENING' : 'WORLD AT REST'}</span></div>
       <div className="viewport" ref={viewport}>
         <div className="hint">DRAG TO ORBIT · SCROLL TO EXPLORE</div>
+        <button className="view-reset" onClick={() => scene.current?.resetCamera()} aria-label="Reset camera view">RESET VIEW</button>
         <div className="coords">X {terrain.frontX.toFixed(1)} · SEED {terrain.seed}</div>
       </div>
       <div className="world-foot"><span>AN EXPLORABLE RECORD OF YOUR SOUND</span><span>{String(updates).padStart(4, '0')} SCULPT UPDATES</span></div>
