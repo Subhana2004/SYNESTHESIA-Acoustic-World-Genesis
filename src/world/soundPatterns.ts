@@ -42,7 +42,7 @@ export function updateSoundPattern(
     const variance = intervals.reduce((sum, interval) => sum + (interval - mean) ** 2, 0) / intervals.length
     const coefficientOfVariation = mean > 0 ? Math.sqrt(variance) / mean : 1
     if (mean >= 180 && mean <= 1200 && coefficientOfVariation <= 0.32) {
-      rhythmStrength = Math.min(1, (1 - coefficientOfVariation / 0.32) * Math.min(1, intervals.length / 4))
+      rhythmStrength = Math.min(1, (1 - coefficientOfVariation / 0.32) * Math.min(1, intervals.length / 3))
     }
   }
 
