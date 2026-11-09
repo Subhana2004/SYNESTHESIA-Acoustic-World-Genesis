@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type MutableRefObject } from 'react'
 import { deleteWorld, listSavedWorlds, loadWorld, renameWorld, restoreWorld, saveWorld, snapshotWorld, parseWorldFile, type RecordedSculpt, type SavedWorldSummary } from './persistence'
 import { replayTerrain, type TerrainState } from './terrain'
 
-type Props = { terrain: TerrainState; history: MutableRefObject<RecordedSculpt[]>; stop: () => void; onWorldChange: (count: number) => void }
+type Props = { terrain: TerrainState; history: MutableRefObject<RecordedSculpt[]>; discoveredIds: string[]; stop: () => void; onWorldChange: (count: number, discoveredIds?: string[]) => void }
 
 function WorldPreview({ values }: { values: number[] }) {
   const min = Math.min(...values)
@@ -18,7 +18,7 @@ function WorldPreview({ values }: { values: number[] }) {
   </svg>
 }
 
-export function WorldMemory({ terrain, history, stop, onWorldChange }: Props) {
+export function WorldMemory({ terrain, history, discoveredIds, stop, onWorldChange }: Props) {
   const [worlds, setWorlds] = useState<SavedWorldSummary[]>([])
   const [selected, setSelected] = useState('')
   const [busy, setBusy] = useState(false)
@@ -34,7 +34,7 @@ export function WorldMemory({ terrain, history, stop, onWorldChange }: Props) {
   const save = async () => {
     stop(); setBusy(true); setMessage('')
     try {
-      const record = snapshotWorld(terrain, 'World ' + new Date().toLocaleString(), history.current)
+      const record = snapshotWorld(terrain, 'World ' + new Date().toLocaleString(), history.current, discoveredIds)
       await saveWorld(record); await refresh(); setSelected(record.id); setRenameValue(record.name)
       setMessage('World saved in this browser.')
     } catch (e) { setMessage(e instanceof Error ? e.message : 'Could not save this world.') }
@@ -49,7 +49,7 @@ export function WorldMemory({ terrain, history, stop, onWorldChange }: Props) {
       if (!record) throw new Error('Saved world not found.')
       restoreWorld(terrain, record)
       history.current = record.history.map(item => ({ features: { ...item.features }, deltaSeconds: item.deltaSeconds }))
-      onWorldChange(record.history.length); setMessage(`“${record.name}” restored.`)
+      onWorldChange(record.history.length, record.discoveredLandmarkIds ?? []); setMessage(`“${record.name}” restored with ${record.discoveredLandmarkIds?.length ?? 0} discoveries.`)
     } catch (e) { setMessage(e instanceof Error ? e.message : 'Could not load this world.') }
     finally { setBusy(false) }
   }
@@ -148,6 +148,7 @@ export function WorldMemory({ terrain, history, stop, onWorldChange }: Props) {
           <span className="world-card-name">{world.name}</span>
           <span className="world-card-meta">{new Date(world.savedAt).toLocaleDateString()} · SEED {world.seed}</span>
           <span className="world-card-meta">{world.sculptCount.toLocaleString()} ACOUSTIC EVENTS</span>
+          <span className="world-card-meta">{world.discoveredCount} / {world.landmarkCount} LANDMARKS · {world.explorationPercent}% EXPLORED</span>
         </button>)}
       </div>
     }
