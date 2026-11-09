@@ -54,7 +54,7 @@ function requestResult<T>(request: IDBRequest<T>): Promise<T> {
 
 function normalizeSavedWorld(value: unknown, requireIdentity = false): SavedWorld {
   const validNumber = (item: unknown): item is number => typeof item === 'number' && Number.isFinite(item)
-  if (!value || typeof value !== 'object') throw new Error('This saved world is invalid or uses an unsupported format.')
+  if (!value || typeof value !== 'object') throw new Error('The world file is incomplete or contains invalid terrain data.')
   const record = value as Partial<SavedWorld>
   if (record.version !== 1 || typeof record.name !== 'string' ||
     !validNumber(record.size) || !Number.isInteger(record.size) || record.size < 2 || record.size > 512 ||
