@@ -623,7 +623,8 @@ export class WorldScene {
     })
     this.eventGroup.clear()
     const half = this.terrain.worldWidth / 2
-    events.slice(-100).forEach((event, index) => {
+    // Keep the journal complete while limiting visible mesh count on mobile GPUs.
+    events.slice(-32).forEach((event, index) => {
       const gx = THREE.MathUtils.clamp(Math.round((event.x + half) / this.terrain.worldWidth * (this.terrain.size - 1)), 0, this.terrain.size - 1)
       const gz = THREE.MathUtils.clamp(Math.round((event.z + half) / this.terrain.worldWidth * (this.terrain.size - 1)), 0, this.terrain.size - 1)
       const y = this.terrain.heights[gz * this.terrain.size + gx]
