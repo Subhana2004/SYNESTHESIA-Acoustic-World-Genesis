@@ -4,6 +4,12 @@ import { generateEnvironmentLayout, sampleTerrainHeight } from './environment'
 import { getBiomeWeights } from './biomes'
 
 describe('procedural environment layout', () => {
+  it('samples terrain rows in the same Z direction as the rendered mesh', () => {
+    const terrain = { size: 3, worldWidth: 2, seed: 1, frontX: 0, heights: new Float32Array([1, 2, 3, 4, 5, 6, 7, 8, 9]) }
+    expect(sampleTerrainHeight(terrain, 0, -1)).toBe(2)
+    expect(sampleTerrainHeight(terrain, 0, 1)).toBe(8)
+  })
+
   it('is deterministic for a fixed terrain seed', () => {
     const terrain = createTerrain()
     expect(generateEnvironmentLayout(terrain)).toEqual(generateEnvironmentLayout(createTerrain()))
