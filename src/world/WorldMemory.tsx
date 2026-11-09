@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { listSavedWorlds, loadWorld, restoreWorld, saveWorld, snapshotWorld } from './persistence'
-import type { TerrainState } from './terrain'
+import { createTerrain, sculptTerrain, type TerrainState } from './terrain'
 import type { RecordedSculpt } from './persistence'
 
 type SavedWorldSummary = { id: string; name: string; savedAt: number; seed: number }
@@ -36,12 +36,12 @@ export function WorldMemory({ terrain, history, stop, onWorldChange }: Props) {
   const replay = () => {
     stop()
     const events = history.current.map(item => ({ features: { ...item.features }, deltaSeconds: item.deltaSeconds }))
-    let state = terrain.seed >>> 0
-    const random = () => { state = (1664525 * state + 1013904223) >>> 0; return state / 4294967296 }
-    void random
-    // Recreate the deterministic base by using the same terrain generator as the live world.
+    const base = createTerrain(terrain.size, terrain.worldWidth, terrain.seed)
+    terrain.heights.set(base.heights)
+    terrain.frontX = base.frontX
+    for (const event of events) sculptTerrain(terrain, event.features, event.deltaSeconds)
     onWorldChange(events.length)
-    setMessage('Replay request prepared. Use Reset world before recording a new take.')
+    setMessage('Creation replayed from the recorded acoustic feature stream.')
   }
   return <div className="memory-tools">
     <div className="eyebrow">WORLD MEMORY · LOCAL TO THIS BROWSER</div>
