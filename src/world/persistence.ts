@@ -30,6 +30,7 @@ const VERSION = 1
 
 function openDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
+    let wasBlocked = false
     if (!('indexedDB' in window)) {
       reject(new Error('This browser does not support local world storage.'))
       return
@@ -40,11 +41,15 @@ function openDatabase(): Promise<IDBDatabase> {
       if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE, { keyPath: 'id' })
     }
     request.onsuccess = () => {
+      if (wasBlocked) { request.result.close(); return }
       request.result.onversionchange = () => request.result.close()
       resolve(request.result)
     }
     request.onerror = () => reject(request.error ?? new Error('Could not open world storage.'))
-    request.onblocked = () => reject(new Error('World storage is busy in another tab. Close other SYNESTHESIA tabs and retry.'))
+    request.onblocked = () => {
+      wasBlocked = true
+      reject(new Error('World storage is busy in another tab. Close other SYNESTHESIA tabs and retry.'))
+    }
   })
 }
 
