@@ -78,7 +78,7 @@ export function WorldMemory({ terrain, history, discoveredIds, events, stop, onW
       document.body.appendChild(anchor)
       anchor.click()
       anchor.remove()
-      URL.revokeObjectURL(url)
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000)
       setMessage('World export prepared as a .synworld.json file.')
     } catch (e) { setMessage(e instanceof Error ? e.message : 'Could not export this world.') }
     finally { setBusy(false) }
@@ -147,7 +147,8 @@ export function WorldMemory({ terrain, history, discoveredIds, events, stop, onW
           <WorldPreview values={world.preview} />
           <span className="world-card-name">{world.name}</span>
           <span className="world-card-meta">{new Date(world.savedAt).toLocaleDateString()} · SEED {world.seed}</span>
-          <span className="world-card-meta">{world.sculptCount.toLocaleString()} ACOUSTIC EVENTS</span>
+          <span className="world-card-meta">{world.sculptCount.toLocaleString()} SCULPT SAMPLES</span>
+          <span className="world-card-meta">{world.eventCount} PHENOMENA · {world.discoveredBiomeCount} BIOMES FOUND</span>
           <span className="world-card-meta">{world.discoveredCount} / {world.landmarkCount} LANDMARKS · {world.explorationPercent}% EXPLORED</span>
           <span className="world-exploration-track" role="progressbar" aria-label={world.name + ' exploration'} aria-valuemin={0} aria-valuemax={100} aria-valuenow={world.explorationPercent}><span style={{ width: world.explorationPercent + '%' }} /></span>
         </button>)}
