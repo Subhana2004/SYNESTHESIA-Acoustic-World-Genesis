@@ -25,7 +25,7 @@ SYNESTHESIA is an experimental browser-based creative instrument that turns non-
 
 ## Run locally
 
-Requirements: Node.js 20+, npm, a modern browser with Web Audio API and WebGL support.
+Requirements: Node.js 20+, npm, a modern browser with Web Audio API and WebGL 2 support.
 
 ~~~bash
 npm install
@@ -46,7 +46,7 @@ npm test          # unit tests
 npm run test:e2e  # Playwright desktop/mobile browser tests
 ~~~
 
-The browser test suite uses Chromium with a software WebGL renderer and a fake microphone. CI installs the browser and runs both desktop and mobile viewport projects.
+The Three.js renderer is lazy-loaded and split from the initial interface bundle. The browser test suite uses Chromium with a software WebGL renderer and a fake microphone. CI runs both desktop and mobile viewport projects, plus a production dependency audit.
 
 ## Current architecture
 
