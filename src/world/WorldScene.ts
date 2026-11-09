@@ -156,36 +156,63 @@ export class WorldScene {
   private createEnvironment(): { flora: THREE.Group; floatingRocks: THREE.InstancedMesh; clouds: THREE.Group } {
     const layout = generateEnvironmentLayout(this.terrain)
     const flora = new THREE.Group()
-    const stemGeometry = new THREE.CylinderGeometry(0.035, 0.075, 0.7, 5)
-    const stemMaterial = new THREE.MeshStandardMaterial({
-      color: '#254c4c', roughness: 0.72, metalness: 0.12,
-    })
-    const stems = new THREE.InstancedMesh(stemGeometry, stemMaterial, layout.flora.length)
-    const bulbGeometry = new THREE.IcosahedronGeometry(0.15, 1)
-    const bulbMaterial = new THREE.MeshStandardMaterial({
-      color: '#9ee9dc', emissive: '#2cbaaa', emissiveIntensity: 1.65,
-      roughness: 0.28, metalness: 0.08,
-    })
-    const bulbs = new THREE.InstancedMesh(bulbGeometry, bulbMaterial, layout.flora.length)
     const transform = new THREE.Object3D()
-    layout.flora.forEach((plant, index) => {
-      const height = 0.7 * plant.scale
-      transform.position.set(plant.x, plant.y + height * 0.5, plant.z)
-      transform.rotation.set(0, plant.hue * Math.PI * 2, (plant.hue - 0.5) * 0.16)
-      transform.scale.set(plant.scale, plant.scale, plant.scale)
-      transform.updateMatrix()
-      stems.setMatrixAt(index, transform.matrix)
+    const species = [
+      {
+        biome: 'mire',
+        stemGeometry: new THREE.CylinderGeometry(0.035, 0.075, 0.7, 5),
+        crownGeometry: new THREE.IcosahedronGeometry(0.15, 1),
+        stemColor: '#254c4c', crownColor: '#9ee9dc', emissive: '#2cbaaa',
+        hueStart: 0.46, hueRange: 0.17,
+      },
+      {
+        biome: 'forest',
+        stemGeometry: new THREE.CylinderGeometry(0.055, 0.09, 0.48, 7),
+        crownGeometry: new THREE.SphereGeometry(0.22, 9, 7),
+        stemColor: '#493d50', crownColor: '#b4a0cf', emissive: '#7554a0',
+        hueStart: 0.72, hueRange: 0.12,
+      },
+      {
+        biome: 'highlands',
+        stemGeometry: new THREE.ConeGeometry(0.12, 0.72, 5),
+        crownGeometry: new THREE.OctahedronGeometry(0.17, 0),
+        stemColor: '#41445f', crownColor: '#d2c6ff', emissive: '#8972db',
+        hueStart: 0.65, hueRange: 0.12,
+      },
+    ] as const
 
-      transform.position.set(plant.x, plant.y + height * 0.96, plant.z)
-      transform.scale.setScalar(plant.scale * (0.72 + plant.hue * 0.28))
-      transform.updateMatrix()
-      bulbs.setMatrixAt(index, transform.matrix)
-      const glow = new THREE.Color().setHSL(0.46 + plant.hue * 0.17, 0.72, 0.62)
-      bulbs.setColorAt(index, glow)
-    })
-    stems.instanceMatrix.needsUpdate = true
-    bulbs.instanceMatrix.needsUpdate = true
-    flora.add(stems, bulbs)
+    for (const speciesType of species) {
+      const plants = layout.flora.filter(plant => plant.biome === speciesType.biome)
+      if (plants.length === 0) continue
+      const stemMaterial = new THREE.MeshStandardMaterial({
+        color: speciesType.stemColor, roughness: 0.72, metalness: 0.12,
+      })
+      const crownMaterial = new THREE.MeshStandardMaterial({
+        color: speciesType.crownColor, emissive: speciesType.emissive,
+        emissiveIntensity: 1.45, roughness: 0.3, metalness: 0.08,
+      })
+      const stems = new THREE.InstancedMesh(speciesType.stemGeometry, stemMaterial, plants.length)
+      const crowns = new THREE.InstancedMesh(speciesType.crownGeometry, crownMaterial, plants.length)
+      plants.forEach((plant, index) => {
+        const height = (speciesType.biome === 'forest' ? 0.48 : 0.72) * plant.scale
+        transform.position.set(plant.x, plant.y + height * 0.5, plant.z)
+        transform.rotation.set(0, plant.hue * Math.PI * 2, (plant.hue - 0.5) * 0.16)
+        transform.scale.set(plant.scale, plant.scale, plant.scale)
+        transform.updateMatrix()
+        stems.setMatrixAt(index, transform.matrix)
+
+        transform.position.set(plant.x, plant.y + height * 0.92, plant.z)
+        transform.scale.setScalar(plant.scale * (0.72 + plant.hue * 0.28))
+        transform.updateMatrix()
+        crowns.setMatrixAt(index, transform.matrix)
+        crowns.setColorAt(index, new THREE.Color().setHSL(
+          speciesType.hueStart + plant.hue * speciesType.hueRange, 0.62, 0.66,
+        ))
+      })
+      stems.instanceMatrix.needsUpdate = true
+      crowns.instanceMatrix.needsUpdate = true
+      flora.add(stems, crowns)
+    }
 
     const rockGeometry = new THREE.DodecahedronGeometry(1, 0)
     const rockMaterial = new THREE.MeshStandardMaterial({
