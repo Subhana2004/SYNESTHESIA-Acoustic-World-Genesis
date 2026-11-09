@@ -1,38 +1,58 @@
 import { useEffect, useState, type MutableRefObject } from 'react'
-import { listSavedWorlds, loadWorld, restoreWorld, saveWorld, snapshotWorld } from './persistence'
+import { deleteWorld, listSavedWorlds, loadWorld, renameWorld, restoreWorld, saveWorld, snapshotWorld, type RecordedSculpt, type SavedWorldSummary } from './persistence'
 import { replayTerrain, type TerrainState } from './terrain'
-import type { RecordedSculpt } from './persistence'
 
-type SavedWorldSummary = { id: string; name: string; savedAt: number; seed: number }
 type Props = { terrain: TerrainState; history: MutableRefObject<RecordedSculpt[]>; stop: () => void; onWorldChange: (count: number) => void }
+
+function WorldPreview({ values }: { values: number[] }) {
+  const min = Math.min(...values)
+  const range = Math.max(0.001, Math.max(...values) - min)
+  const points = values.map((value, index) => {
+    const x = values.length > 1 ? (index / (values.length - 1)) * 180 : 90
+    const y = 39 - ((value - min) / range) * 31
+    return `${x.toFixed(1)},${y.toFixed(1)}`
+  }).join(' ')
+  return <svg className="world-preview" viewBox="0 0 180 46" role="img" aria-label="Terrain silhouette preview">
+    <path d="M0 43 H180" />
+    <polyline points={points} />
+  </svg>
+}
 
 export function WorldMemory({ terrain, history, stop, onWorldChange }: Props) {
   const [worlds, setWorlds] = useState<SavedWorldSummary[]>([])
   const [selected, setSelected] = useState('')
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
+  const [renameValue, setRenameValue] = useState('')
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const refresh = async () => { const items = await listSavedWorlds(); setWorlds(items) }
+  const selectedWorld = worlds.find(world => world.id === selected)
+
   useEffect(() => { void refresh().catch(e => setMessage(e instanceof Error ? e.message : 'Could not read saved worlds.')) }, [])
+
   const save = async () => {
     stop(); setBusy(true); setMessage('')
     try {
       const record = snapshotWorld(terrain, 'World ' + new Date().toLocaleString(), history.current)
-      await saveWorld(record); await refresh(); setSelected(record.id); setMessage('World saved in this browser.')
+      await saveWorld(record); await refresh(); setSelected(record.id); setRenameValue(record.name)
+      setMessage('World saved in this browser.')
     } catch (e) { setMessage(e instanceof Error ? e.message : 'Could not save this world.') }
     finally { setBusy(false) }
   }
-  const load = async () => {
-    if (!selected) return
+
+  const load = async (id = selected) => {
+    if (!id) return
     stop(); setBusy(true); setMessage('')
     try {
-      const record = await loadWorld(selected)
+      const record = await loadWorld(id)
       if (!record) throw new Error('Saved world not found.')
       restoreWorld(terrain, record)
       history.current = record.history.map(item => ({ features: { ...item.features }, deltaSeconds: item.deltaSeconds }))
-      onWorldChange(record.history.length); setMessage('World restored.')
+      onWorldChange(record.history.length); setMessage(`“${record.name}” restored.`)
     } catch (e) { setMessage(e instanceof Error ? e.message : 'Could not load this world.') }
     finally { setBusy(false) }
   }
+
   const replay = () => {
     stop()
     const events = history.current.map(item => ({ features: { ...item.features }, deltaSeconds: item.deltaSeconds }))
@@ -42,19 +62,67 @@ export function WorldMemory({ terrain, history, stop, onWorldChange }: Props) {
     onWorldChange(events.length)
     setMessage('Creation replayed from the recorded acoustic feature stream.')
   }
-  return <div className="memory-tools">
-    <div className="eyebrow">WORLD MEMORY · LOCAL TO THIS BROWSER</div>
-    <div className="memory-actions">
-      <button className="secondary" onClick={save} disabled={busy}>SAVE WORLD</button>
-      <button className="secondary" onClick={replay} disabled={busy || history.current.length === 0}>REPLAY HISTORY</button>
+
+  const rename = async () => {
+    if (!selected) return
+    setBusy(true); setMessage('')
+    try {
+      await renameWorld(selected, renameValue)
+      await refresh()
+      setMessage('World renamed.')
+    } catch (e) { setMessage(e instanceof Error ? e.message : 'Could not rename this world.') }
+    finally { setBusy(false) }
+  }
+
+  const remove = async () => {
+    if (!selected) return
+    setBusy(true); setMessage('')
+    try {
+      await deleteWorld(selected)
+      setWorlds(current => current.filter(world => world.id !== selected))
+      setSelected(''); setRenameValue(''); setConfirmDelete(false)
+      setMessage('Saved world deleted from this browser.')
+    } catch (e) { setMessage(e instanceof Error ? e.message : 'Could not delete this world.') }
+    finally { setBusy(false) }
+  }
+
+  return <section className="memory-tools" aria-label="World memory">
+    <div className="memory-heading">
+      <div className="eyebrow">WORLD MEMORY · LOCAL TO THIS BROWSER</div>
+      <span>{worlds.length} {worlds.length === 1 ? 'WORLD' : 'WORLDS'}</span>
     </div>
     <div className="memory-actions">
-      <select aria-label="Saved worlds" value={selected} onChange={e => setSelected(e.target.value)}>
-        <option value="">Choose a saved world ({worlds.length})</option>
-        {worlds.map(world => <option key={world.id} value={world.id}>{world.name} · seed {world.seed}</option>)}
-      </select>
-      <button className="secondary" onClick={load} disabled={busy || !selected}>LOAD</button>
+      <button className="secondary" onClick={save} disabled={busy}>SAVE CURRENT WORLD</button>
+      <button className="secondary" onClick={replay} disabled={busy || history.current.length === 0}>REPLAY CREATION</button>
     </div>
+
+    {worlds.length === 0 ? <p className="memory-empty">Your gallery is quiet for now. Generate a landscape and save it to begin your collection.</p> :
+      <div className="world-gallery">
+        {worlds.map(world => <button type="button" className={`world-card ${selected === world.id ? 'selected' : ''}`} key={world.id}
+          onClick={() => { setSelected(world.id); setRenameValue(world.name); setConfirmDelete(false) }} aria-pressed={selected === world.id}>
+          <WorldPreview values={world.preview} />
+          <span className="world-card-name">{world.name}</span>
+          <span className="world-card-meta">{new Date(world.savedAt).toLocaleDateString()} · SEED {world.seed}</span>
+          <span className="world-card-meta">{world.sculptCount.toLocaleString()} ACOUSTIC EVENTS</span>
+        </button>)}
+      </div>
+    }
+
+    {selectedWorld && <div className="world-management">
+      <div className="memory-actions world-manage-row">
+        <input aria-label="World name" maxLength={64} value={renameValue} onChange={e => setRenameValue(e.target.value)} />
+        <button className="secondary" onClick={rename} disabled={busy || !renameValue.trim() || renameValue.trim() === selectedWorld.name}>RENAME</button>
+        <button className="secondary danger-action" onClick={() => setConfirmDelete(value => !value)} disabled={busy}>DELETE</button>
+        <button className="secondary load-action" onClick={() => void load()} disabled={busy}>LOAD WORLD</button>
+      </div>
+      {confirmDelete && <div className="delete-confirm" role="group" aria-label="Confirm world deletion">
+        <span>Delete “{selectedWorld.name}” permanently from this browser?</span>
+        <button className="secondary danger-action" onClick={() => void remove()} disabled={busy}>YES, DELETE</button>
+        <button className="secondary" onClick={() => setConfirmDelete(false)} disabled={busy}>CANCEL</button>
+      </div>}
+    </div>}
+
     {message && <p className="memory-message" role="status">{message}</p>}
-  </div>
+    <p className="memory-privacy">Saved locally in this browser. Microphone recordings are never stored.</p>
+  </section>
 }
