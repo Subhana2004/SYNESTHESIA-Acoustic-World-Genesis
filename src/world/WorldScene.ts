@@ -5,6 +5,7 @@ import type { TerrainState } from './terrain'
 import { generateEnvironmentLayout } from './environment'
 import { getBiomeWeights } from './biomes'
 import { updateSoundPattern, type SoundPattern, type SoundPatternState } from './soundPatterns'
+import { deriveSoundTraces, type TraceEvent } from './soundTraces'
 
 export class WorldScene {
   private renderer: THREE.WebGLRenderer
@@ -50,6 +51,7 @@ export class WorldScene {
   private soundPatternState: SoundPatternState = { sustainedSince: null, onsetTimes: [], lastOnset: -Infinity }
   private soundPattern: SoundPattern = 'ambient'
   private rhythmStrength = 0
+  private traceGroup = new THREE.Group()
 
   constructor(private host: HTMLDivElement, private terrain: TerrainState) {
     this.scene.background = new THREE.Color('#080a12')
@@ -104,6 +106,7 @@ export class WorldScene {
     })
     this.soundMotes = new THREE.Points(moteGeometry, this.moteMaterial)
     this.scene.add(this.soundMotes)
+    this.scene.add(this.traceGroup)
 
     // Expanding wavefronts visualise accents at the active generation point.
     for (let i = 0; i < 3; i++) {
@@ -203,6 +206,35 @@ export class WorldScene {
     this.targetAccentZ = Math.sin((this.targetAccentX + this.terrain.worldWidth / 2) * 0.11) * 2.5
     const accentColor = new THREE.Color('#55d6c2').lerp(new THREE.Color('#9b7bff'), blend)
     this.accentLight.color.copy(accentColor)
+  }
+
+  updateSoundTraces(history: readonly TraceEvent[]): void {
+    for (const object of this.traceGroup.children) {
+      if (object instanceof THREE.Mesh) {
+        object.geometry.dispose()
+        ;(object.material as THREE.Material).dispose()
+      }
+    }
+    this.traceGroup.clear()
+    const traces = deriveSoundTraces(this.terrain, history)
+    for (const trace of traces) {
+      const accent = trace.kind === 'accent'
+      const high = trace.kind === 'high'
+      const color = accent ? '#f2c879' : high ? '#a58cff' : '#55d6c2'
+      const geometry = accent
+        ? new THREE.TorusGeometry(0.28 + trace.strength * 0.15, 0.028, 5, 24)
+        : high
+          ? new THREE.OctahedronGeometry(0.22 + trace.strength * 0.18)
+          : new THREE.CylinderGeometry(0.06, 0.16, 0.45 + trace.strength * 0.3, 6)
+      const material = new THREE.MeshStandardMaterial({
+        color, emissive: color, emissiveIntensity: 0.65,
+        transparent: true, opacity: 0.82, roughness: 0.42,
+      })
+      const marker = new THREE.Mesh(geometry, material)
+      marker.position.set(trace.x, trace.y + (accent ? 0.28 : 0.35), trace.z)
+      if (accent) marker.rotation.x = Math.PI / 2
+      this.traceGroup.add(marker)
+    }
   }
 
   private createEnvironment(): { flora: THREE.Group; floatingRocks: THREE.InstancedMesh; clouds: THREE.Group } {
@@ -565,6 +597,7 @@ export class WorldScene {
     window.removeEventListener('resize', this.resize)
     this.controls.dispose()
     this.geometry.dispose()
+    this.updateSoundTraces([])
     this.water.geometry.dispose()
     this.soundMotes.geometry.dispose()
     this.moteMaterial.dispose()
