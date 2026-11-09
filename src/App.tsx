@@ -3,6 +3,8 @@ import { AudioEngine } from './audio/AudioEngine'
 import { mapAtmosphere, type AcousticFeatures } from './audio/features'
 import { createTerrain, sculptTerrain } from './world/terrain'
 import { WorldScene } from './world/WorldScene'
+import { WorldMemory } from './world/WorldMemory'
+import type { RecordedSculpt } from './world/persistence'
 
 const terrain = createTerrain()
 
@@ -11,6 +13,7 @@ export default function App() {
   const scene = useRef<WorldScene | null>(null)
   const audio = useRef<AudioEngine | null>(null)
   const lastUpdate = useRef(0)
+  const history = useRef<RecordedSculpt[]>([])
   const [listening, setListening] = useState(false)
   const [error, setError] = useState('')
   const [features, setFeatures] = useState<AcousticFeatures | null>(null)
@@ -45,6 +48,8 @@ export default function App() {
         const before = terrain.frontX
         sculptTerrain(terrain, f, dt)
         if (terrain.frontX !== before) {
+          history.current.push({ features: { ...f }, deltaSeconds: dt })
+          if (history.current.length > 20000) history.current.shift()
           scene.current?.updateTerrain()
           scene.current?.updateAcousticAtmosphere(mapAtmosphere(f), terrain.frontX)
           setUpdates(v => v + 1)
@@ -68,6 +73,7 @@ export default function App() {
     scene.current?.updateAcousticAtmosphere({ spectralBlend: 0.35, onsetPulse: 0, energy: 0 }, terrain.frontX)
     setUpdates(0)
     setFeatures(null)
+    history.current = []
   }
 
   return <main className="shell">
@@ -104,6 +110,13 @@ export default function App() {
           <button className="secondary" onClick={reset}>Reset world</button>
         </div>
       </div>
+      <WorldMemory terrain={terrain} history={history} stop={stop} onWorldChange={(count) => {
+        scene.current?.updateTerrain()
+        scene.current?.updateAcousticAtmosphere({ spectralBlend: 0.35, onsetPulse: 0, energy: 0 }, terrain.frontX)
+        scene.current?.resetCamera()
+        setUpdates(count)
+        setFeatures(null)
+      }} />
       <div className="readouts" aria-live="polite">
         <div><span>FUNDAMENTAL / HZ</span><strong>{features?.pitchHz ? Math.round(features.pitchHz) : '—'}</strong><small>{features?.pitchHz ? 'CONFIDENCE ' + Math.round(features.pitchConfidence * 100) + '%' : 'NO STABLE PITCH'}</small></div>
         <div><span>RMS ENERGY</span><strong>{features ? features.rms.toFixed(3) : '0.000'}</strong><small>{features?.isSilent ? 'SILENCE' : features ? 'SIGNAL DETECTED' : 'AWAITING INPUT'}</small></div>
