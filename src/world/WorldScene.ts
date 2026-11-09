@@ -3,6 +3,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import type { AtmosphereControls } from '../audio/features'
 import type { TerrainState } from './terrain'
 import { generateEnvironmentLayout } from './environment'
+import { getBiomeWeights } from './biomes'
 
 export class WorldScene {
   private renderer: THREE.WebGLRenderer
@@ -315,11 +316,8 @@ export class WorldScene {
   }
 
   private terrainColor(height: number): THREE.Color {
-    const lowland = 1 - THREE.MathUtils.smoothstep(height, -0.05, 0.55)
-    const highland = THREE.MathUtils.smoothstep(height, 0.8, 1.85)
-    const woodland = Math.max(0, 1 - lowland - highland)
-    const total = Math.max(0.0001, lowland + woodland + highland)
-    const weights = [lowland / total, woodland / total, highland / total]
+    const biomes = getBiomeWeights(height)
+    const weights = [biomes.mire, biomes.forest, biomes.highlands]
 
     // Each elevation band has its own identity; the live spectrum shifts the
     // shared accent from glacial teal toward dreamlike violet.
