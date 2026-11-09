@@ -20,7 +20,7 @@ ApplicationController coordinates permission, start/stop, and lifecycle. Audio a
 | SculptingController | Spatial placement, brush footprint, bounded updates | WebGL objects |
 | TerrainGenerator | Deterministic heightfield mutation | Browser permission |
 | Renderer | Display world state and camera | Audio feature estimation |
-| PersistenceManager | Versioned save/load (planned) | Audio capture |
+| PersistenceManager | Versioned local save/load, gallery, replay and validated import/export | Audio capture |
 | ApplicationController | Coordinate application lifecycle | Geometry algorithms |
 
 ## Initial acoustic grammar
