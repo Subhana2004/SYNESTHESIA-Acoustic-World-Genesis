@@ -232,23 +232,31 @@ export class WorldScene {
     }
     this.traceGroup.clear()
     const traces = deriveSoundTraces(this.terrain, history)
-    for (const trace of traces) {
-      const accent = trace.kind === 'accent'
-      const high = trace.kind === 'high'
-      const color = accent ? '#f2c879' : high ? '#a58cff' : '#55d6c2'
-      const geometry = accent
-        ? new THREE.TorusGeometry(0.28 + trace.strength * 0.15, 0.028, 5, 24)
-        : high
-          ? new THREE.OctahedronGeometry(0.22 + trace.strength * 0.18)
-          : new THREE.CylinderGeometry(0.06, 0.16, 0.45 + trace.strength * 0.3, 6)
+    const transform = new THREE.Object3D()
+    const kinds = ['low', 'high', 'accent'] as const
+    for (const kind of kinds) {
+      const group = traces.filter(trace => trace.kind === kind)
+      if (group.length === 0) continue
+      const geometry = kind === 'accent'
+        ? new THREE.TorusGeometry(0.34, 0.028, 5, 24)
+        : kind === 'high'
+          ? new THREE.OctahedronGeometry(0.34)
+          : new THREE.CylinderGeometry(0.11, 0.16, 0.72, 6)
+      const color = kind === 'accent' ? '#f2c879' : kind === 'high' ? '#a58cff' : '#55d6c2'
       const material = new THREE.MeshStandardMaterial({
         color, emissive: color, emissiveIntensity: 0.65,
         transparent: true, opacity: 0.82, roughness: 0.42,
       })
-      const marker = new THREE.Mesh(geometry, material)
-      marker.position.set(trace.x, trace.y + (accent ? 0.28 : 0.35), trace.z)
-      if (accent) marker.rotation.x = Math.PI / 2
-      this.traceGroup.add(marker)
+      const instances = new THREE.InstancedMesh(geometry, material, group.length)
+      group.forEach((trace, index) => {
+        transform.position.set(trace.x, trace.y + (kind === 'accent' ? 0.28 : 0.35), trace.z)
+        transform.rotation.set(kind === 'accent' ? Math.PI / 2 : 0, 0, 0)
+        transform.scale.setScalar(0.72 + trace.strength * 0.5)
+        transform.updateMatrix()
+        instances.setMatrixAt(index, transform.matrix)
+      })
+      instances.instanceMatrix.needsUpdate = true
+      this.traceGroup.add(instances)
     }
   }
 
