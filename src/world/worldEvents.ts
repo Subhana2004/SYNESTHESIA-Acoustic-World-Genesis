@@ -55,7 +55,7 @@ export function validateWorldEvents(value: unknown): WorldEvent[] {
     !!item && typeof item === 'object' &&
     typeof item.id === 'string' && item.id.length <= 100 &&
     kinds.includes(item.kind) && biomes.includes(item.biome) &&
-    Number.isFinite(item.x) && Number.isFinite(item.z) &&
+    Number.isFinite(item.x) && Math.abs(item.x) <= 512 && Number.isFinite(item.z) && Math.abs(item.z) <= 512 &&
     Number.isFinite(item.intensity) && item.intensity >= 0 && item.intensity <= 1 &&
     Number.isFinite(item.timestamp),
   )
