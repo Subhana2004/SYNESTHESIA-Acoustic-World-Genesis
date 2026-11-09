@@ -13,8 +13,28 @@ describe('pitch estimation', () => {
     expect(result.pitchHz as number).toBeGreaterThan(205)
     expect(result.pitchHz as number).toBeLessThan(235)
   })
+  it('tracks a lower 110 Hz tone', () => {
+    const result = estimatePitch(sine(110), 48000)
+    expect(result.pitchHz).not.toBeNull()
+    expect(result.pitchHz as number).toBeGreaterThan(100)
+    expect(result.pitchHz as number).toBeLessThan(120)
+  })
+  it('tracks a higher 440 Hz tone', () => {
+    const result = estimatePitch(sine(440), 48000)
+    expect(result.pitchHz).not.toBeNull()
+    expect(result.pitchHz as number).toBeGreaterThan(425)
+    expect(result.pitchHz as number).toBeLessThan(455)
+  })
   it('does not invent pitch for silence', () => {
     expect(estimatePitch(new Float32Array(2048), 48000).pitchHz).toBeNull()
+  })
+  it('rejects deterministic broadband noise as an unstable pitch', () => {
+    let state = 123456789
+    const noise = Float32Array.from({ length: 2048 }, () => {
+      state = (1664525 * state + 1013904223) >>> 0
+      return (state / 4294967296 - 0.5) * 0.8
+    })
+    expect(estimatePitch(noise, 48000).pitchHz).toBeNull()
   })
 })
 describe('acoustic mapping', () => {
