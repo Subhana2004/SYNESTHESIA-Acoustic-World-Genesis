@@ -71,6 +71,15 @@ describe('portable world files', () => {
     expect(snapshot.discoveredLandmarkIds).toEqual(['summit', 'echo'])
   })
 
+  it('includes event history in saved world snapshots', () => {
+    const event = createWorldEvent(createTerrain(), {
+      timestamp: 1234, rms: 0.2, pitchHz: 520, pitchConfidence: 0.9,
+      spectralCentroidHz: 1800, onsetStrength: 0.9, isSilent: false,
+    }, 'accent', 5)!
+    const snapshot = snapshotWorld(createTerrain(), 'Eventful world', [], [], [event])
+    expect(snapshot.events).toEqual([event])
+  })
+
   it('preserves a validated event journal when importing a world', () => {
     const event = createWorldEvent(createTerrain(), {
       timestamp: 1234, rms: 0.2, pitchHz: 520, pitchConfidence: 0.9,
