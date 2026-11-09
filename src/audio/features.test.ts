@@ -59,10 +59,18 @@ describe('atmosphere mapping', () => {
     const controls = mapAtmosphere({ ...sample, onsetStrength: 1.8, rms: 0.5 })
     expect(controls.onsetPulse).toBe(1)
     expect(controls.energy).toBe(1)
+    expect(controls.pitchTone).toBeGreaterThanOrEqual(0)
+    expect(controls.pitchTone).toBeLessThanOrEqual(1)
+  })
+  it('maps higher stable pitches to a higher pitch tone', () => {
+    const low = mapAtmosphere({ ...sample, pitchHz: 100 })
+    const high = mapAtmosphere({ ...sample, pitchHz: 700 })
+    expect(low.pitchTone).toBeLessThan(high.pitchTone)
   })
   it('does not emit an onset pulse during silence', () => {
     const controls = mapAtmosphere({ ...sample, isSilent: true, onsetStrength: 1 })
     expect(controls.onsetPulse).toBe(0)
     expect(controls.energy).toBe(0)
+    expect(controls.pitchTone).toBe(0.35)
   })
 })
