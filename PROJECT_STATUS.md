@@ -9,7 +9,7 @@ Last updated: 2026-11-10
 | M0 — Architecture and feasibility | In progress | Architecture and risk decisions documented in ARCHITECTURE.md |
 | M1 — Audio foundation | In progress | Browser microphone capture and initial feature extraction scaffolded; automated verification still needs confirmation |
 | M2 — Acoustic terrain genesis | Initial implementation in progress | Hybrid landforms, dark renderer palette, sound-reactive teal/violet lighting and onset accents committed |
-| M3 — Persistence and replay | Initial implementation in progress | Versioned IndexedDB save/load, local world library and deterministic feature-stream replay committed; browser validation pending |
+| M3 — Persistence and replay | Initial implementation in progress | IndexedDB save/load, visual world gallery with terrain previews, rename/delete controls and deterministic feature-stream replay committed; browser validation pending |
 | M4 — Environment construction | Not started | Extended materials, vegetation, water, clouds and biomes remain outstanding |
 | M5 — Visual and interaction refinement | Not started | Accessibility, responsive controls and performance profiling remain outstanding |
 | M6 — Integration and validation | Not started | Full browser/device validation remains outstanding |
@@ -31,7 +31,7 @@ The current branch contains a first end-to-end prototype and the first M2 visual
 - Terrain vertex colours now shift subtly between teal and violet with spectral centroid; updates are smoothed and throttled.
 - Orbit exploration supports pan and zoom, with a one-click camera reset.
 - Versioned IndexedDB world storage records terrain dimensions, seed, heightfield, generation front and bounded acoustic sculpt history.
-- Local world library supports save, list, load and deterministic replay of the recorded feature stream; no microphone audio samples are stored.
+- Local world gallery supports save, visual terrain-profile previews, rename, delete, load and deterministic replay of the recorded feature stream; no microphone audio samples are stored.
 - Environmental motion continues independently of microphone input; terrain geometry is not changed by these ambient effects.
 - Dark application interface to match the in-world visual direction.
 - Unit tests for core mapping, terrain behaviour and bounded atmospheric controls.
@@ -54,7 +54,7 @@ GitHub Actions reported successful unit-test and production-build runs for the s
 - Pitch estimation is a lightweight autocorrelation starter, not a validated production pitch tracker.
 - Rhythm is not yet robustly estimated; onset strength is only a simple frame-to-frame energy change.
 - The first renderer updates a single heightfield mesh; large worlds need chunking and profiling.
-- Import/export and undo are not implemented yet; IndexedDB save/load and deterministic feature replay are now implemented but need browser validation.
+- Import/export and undo are not implemented yet; IndexedDB save/load, gallery management and deterministic feature replay are implemented but need browser validation.
 - Atmospheric response drives lights and a subtle, smoothed terrain vertex-colour shift; water and terrain materials remain procedural.
 - Mist, stars and ridge crystals are a first lightweight environmental pass; density, visibility and performance still need browser review.
 - No AI/ML model is required or included in this first version.
