@@ -11,6 +11,7 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
+          if (id.includes('/node_modules/three/examples/jsm/controls/')) return 'three-controls'
           if (id.includes('/node_modules/three/')) return 'three-vendor'
           if (id.includes('/node_modules/react/')) return 'react-vendor'
         },
