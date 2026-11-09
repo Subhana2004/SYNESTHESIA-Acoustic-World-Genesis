@@ -9,6 +9,20 @@ import { deriveSoundTraces, type TraceEvent } from './soundTraces'
 import type { WorldLandmark } from './discovery'
 import type { WorldEvent } from './worldEvents'
 
+function disposeObjectResources(root: THREE.Object3D): void {
+  const geometries = new Set<THREE.BufferGeometry>()
+  const materials = new Set<THREE.Material>()
+  root.traverse(object => {
+    if (object instanceof THREE.Mesh || object instanceof THREE.Points) {
+      geometries.add(object.geometry)
+      const assigned = Array.isArray(object.material) ? object.material : [object.material]
+      assigned.forEach(material => materials.add(material))
+    }
+  })
+  geometries.forEach(geometry => geometry.dispose())
+  materials.forEach(material => material.dispose())
+}
+
 export interface TerrainInspection { x: number; z: number; elevation: number; biome: 'mire' | 'forest' | 'highlands' }
 
 export class WorldScene {
@@ -21,6 +35,7 @@ export class WorldScene {
   private inspectionMarker: THREE.Mesh
   private frame = 0
   private disposed = false
+  private resizeObserver: ResizeObserver | null = null
   private tealLight: THREE.PointLight
   private violetLight: THREE.PointLight
   private accentLight: THREE.PointLight
@@ -215,6 +230,10 @@ export class WorldScene {
     this.updateTerrain()
     this.resize()
     window.addEventListener('resize', this.resize)
+    if ('ResizeObserver' in window) {
+      this.resizeObserver = new ResizeObserver(this.resize)
+      this.resizeObserver.observe(host)
+    }
     document.addEventListener('visibilitychange', this.handleVisibilityChange)
     this.animate()
   }
@@ -394,10 +413,10 @@ export class WorldScene {
   private createBasinWater(): { surface: THREE.Mesh; ring: THREE.Mesh; material: THREE.MeshStandardMaterial } {
     // The basin is centred near the lowland depression defined by the terrain generator.
     const centerX = this.terrain.worldWidth * 0.06
-    const centerZ = this.terrain.worldWidth * 0.04
+    const centerZ = -this.terrain.worldWidth * 0.04
     const step = this.terrain.worldWidth / (this.terrain.size - 1)
     const centerCol = Math.round(centerX / step + (this.terrain.size - 1) / 2)
-    const centerRow = Math.round((this.terrain.size - 1) / 2 - centerZ / step)
+    const centerRow = Math.round((this.terrain.size - 1) / 2 + centerZ / step)
     let basinFloor = Infinity
     for (let row = Math.max(0, centerRow - 7); row <= Math.min(this.terrain.size - 1, centerRow + 7); row++) {
       for (let col = Math.max(0, centerCol - 7); col <= Math.min(this.terrain.size - 1, centerCol + 7); col++) {
@@ -428,6 +447,24 @@ export class WorldScene {
     return { surface, ring, material }
   }
 
+  rebuildWorldEnvironment(): void {
+    this.scene.remove(this.crystals, this.flora, this.floatingRocks, this.clouds, this.water, this.waterRing)
+    for (const object of [this.crystals, this.flora, this.floatingRocks, this.clouds, this.water, this.waterRing]) {
+      disposeObjectResources(object)
+    }
+    this.crystals = this.createRidgeCrystals()
+    const environment = this.createEnvironment()
+    this.flora = environment.flora
+    this.floatingRocks = environment.floatingRocks
+    this.clouds = environment.clouds
+    const waterParts = this.createBasinWater()
+    this.water = waterParts.surface
+    this.waterRing = waterParts.ring
+    this.waterMaterial = waterParts.material
+    this.scene.add(this.crystals, this.flora, this.floatingRocks, this.clouds, this.water, this.waterRing)
+    this.updateTerrain()
+  }
+
   resetCamera(): void {
     this.camera.position.set(24, 19, 29)
     this.controls.target.set(0, 0.4, 0)
@@ -444,7 +481,7 @@ export class WorldScene {
         const height = this.terrain.heights[index]
         if (height < 1.05) continue
         const x = (col / (this.terrain.size - 1) - 0.5) * this.terrain.worldWidth
-        const z = (0.5 - row / (this.terrain.size - 1)) * this.terrain.worldWidth
+        const z = (row / (this.terrain.size - 1) - 0.5) * this.terrain.worldWidth
         candidates.push({ x, z, y: height })
       }
     }
@@ -501,12 +538,6 @@ export class WorldScene {
   }
 
   updateDiscoveries(landmarks: readonly WorldLandmark[]): void {
-    this.eventGroup.traverse(object => {
-      if (object instanceof THREE.Mesh) {
-        object.geometry.dispose()
-        ;(object.material as THREE.Material).dispose()
-      }
-    })
     this.discoveryGroup.traverse(object => {
       if (object instanceof THREE.Mesh) {
         object.geometry.dispose()
@@ -575,6 +606,18 @@ export class WorldScene {
       marker.scale.setScalar(0.8 + event.intensity * 0.45)
       this.eventGroup.add(marker)
     })
+  }
+
+  pickWorldEventAt(clientX: number, clientY: number): string | null {
+    const rect = this.renderer.domElement.getBoundingClientRect()
+    const pointer = new THREE.Vector2(
+      ((clientX - rect.left) / rect.width) * 2 - 1,
+      -((clientY - rect.top) / rect.height) * 2 + 1,
+    )
+    const raycaster = new THREE.Raycaster()
+    raycaster.setFromCamera(pointer, this.camera)
+    const hit = raycaster.intersectObjects(this.eventGroup.children, false)[0]
+    return hit ? String(hit.object.userData.eventId ?? '') || null : null
   }
 
   pickDiscoveryAt(clientX: number, clientY: number): string | null {
@@ -784,61 +827,21 @@ export class WorldScene {
   }
 
   dispose(): void {
+    if (this.disposed) return
     this.disposed = true
     cancelAnimationFrame(this.frame)
     window.removeEventListener('resize', this.resize)
+    this.resizeObserver?.disconnect()
+    this.resizeObserver = null
     document.removeEventListener('visibilitychange', this.handleVisibilityChange)
     this.controls.dispose()
-    this.geometry.dispose()
-    this.discoveryGroup.traverse(object => {
-      if (object instanceof THREE.Mesh) {
-        object.geometry.dispose()
-        ;(object.material as THREE.Material).dispose()
-      }
-    })
-    this.inspectionMarker.geometry.dispose()
-    ;(this.inspectionMarker.material as THREE.Material).dispose()
     this.updateSoundTraces([])
-    this.water.geometry.dispose()
-    this.soundMotes.geometry.dispose()
-    this.moteMaterial.dispose()
-    this.soundRipples.forEach(ring => {
-      ring.geometry.dispose()
-      ;(ring.material as THREE.Material).dispose()
-    })
-    this.waterMaterial.dispose()
-    this.waterRing.geometry.dispose()
-    ;(this.waterRing.material as THREE.Material).dispose()
-    this.mist.geometry.dispose()
-    ;(this.mist.material as THREE.Material).dispose()
-    this.stars.geometry.dispose()
-    ;(this.stars.material as THREE.Material).dispose()
-    this.crystals.traverse(object => {
-      if (object instanceof THREE.Mesh) object.geometry.dispose()
-    })
-    const environmentGeometries = new Set<THREE.BufferGeometry>()
-    const environmentMaterials = new Set<THREE.Material>()
-    for (const group of [this.flora, this.clouds]) group.traverse(object => {
-      if (object instanceof THREE.Mesh || object instanceof THREE.InstancedMesh) {
-        environmentGeometries.add(object.geometry)
-        const materials = Array.isArray(object.material) ? object.material : [object.material]
-        materials.forEach(material => environmentMaterials.add(material))
-      }
-    })
-    environmentGeometries.add(this.floatingRocks.geometry)
-    const rockMaterials = Array.isArray(this.floatingRocks.material) ? this.floatingRocks.material : [this.floatingRocks.material]
-    rockMaterials.forEach(material => environmentMaterials.add(material))
-    environmentGeometries.forEach(geometry => geometry.dispose())
-    environmentMaterials.forEach(material => material.dispose())
-    const crystalMaterials = new Set<THREE.Material>()
-    this.crystals.traverse(object => {
-      if (object instanceof THREE.Mesh) {
-        const material = object.material
-        if (Array.isArray(material)) material.forEach(item => crystalMaterials.add(item))
-        else crystalMaterials.add(material)
-      }
-    })
-    crystalMaterials.forEach(material => material.dispose())
+    for (const object of [
+      this.discoveryGroup, this.eventGroup, this.inspectionMarker, this.soundMotes,
+      ...this.soundRipples, this.water, this.waterRing, this.mist, this.stars,
+      this.crystals, this.flora, this.floatingRocks, this.clouds,
+    ]) disposeObjectResources(object)
+    this.geometry.dispose()
     ;(this.mesh.material as THREE.Material).dispose()
     this.renderer.dispose()
     this.renderer.domElement.remove()
