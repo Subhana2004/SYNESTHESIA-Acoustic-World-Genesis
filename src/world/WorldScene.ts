@@ -36,6 +36,7 @@ export class WorldScene {
     this.geometry.setAttribute('color', new THREE.Float32BufferAttribute(this.vertexColors(), 3))
     this.mesh = new THREE.Mesh(this.geometry, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92 }))
     this.scene.add(this.mesh)
+    this.updateTerrain()
     this.resize()
     window.addEventListener('resize', this.resize)
     this.animate()
