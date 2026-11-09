@@ -15,6 +15,7 @@ module.exports = defineConfig({
         '--use-gl=angle',
         '--use-angle=swiftshader',
         '--enable-webgl',
+        '--enable-unsafe-swiftshader',
         '--ignore-gpu-blocklist',
         '--disable-dev-shm-usage',
         '--use-fake-device-for-media-stream',
