@@ -16,7 +16,7 @@ Use recognisable landforms as the primary structure:
 - Broad valleys and basins create navigable low areas.
 - Mountain chains and ridges create silhouettes and elevation changes.
 - Rolling plains and plateaus provide quieter transitions.
-- Water-like or reflective lowland features may be introduced as a later environment layer.
+- Reflective lowland water is included as a seeded basin feature.
 
 Add surreal elements as accents rather than replacing geography:
 - Unusually smooth or curved ridgelines.
@@ -94,11 +94,11 @@ The mapping remains an artistic control system, not a universal scientific relat
 | Confident pitch | Controls target elevation band | If confidence is low, treat pitch as unavailable |
 | RMS energy | Controls deformation strength and scale | Clamp displacement and smooth the brush |
 | Pitch change | Influences local roughness / ridge character | Smooth transitions; avoid vertex spikes |
-| Spectral centroid | Future material brightness / teal-violet accent | Keep visual response bounded and secondary |
-| Onset strength | Future localised glow, ripple or landmark accent | Do not create large terrain jumps from one onset |
+| Spectral centroid | Controls the teal-violet palette blend and environmental accent colour | Keep visual response bounded and secondary |
+| Onset strength | Drives transient wavefronts, sound landmarks and rare accent phenomena | Do not create large terrain jumps from one onset |
 | Silence | Stops terrain edits | Never erase or flatten existing terrain |
 
-The first M2 implementation should prioritise robust landform shaping and dark materials. Spectral/onset-driven environmental effects can follow once the base terrain is stable.
+The delivered implementation layers spectral and onset feedback over the stable terrain through lights, terrain colours, spatial wavefronts, sound traces and biome-aware phenomena. These remain non-destructive visual responses unless an accepted feature frame sculpts the heightfield.
 
 ## 5. Proposed architecture
 
@@ -116,7 +116,7 @@ Keep the existing separation between audio, terrain state and renderer. Introduc
 
 The renderer must consume world state; it must not own acoustic analysis or be the source of truth for terrain.
 
-## 6. M2 implementation sequence
+## 6. M2 implementation sequence (delivered)
 
 1. **Landform quality:** improve the seeded base heightfield so it contains broad geographic forms rather than only low-amplitude noise.
 2. **Sound sculpting:** tune brush radius, falloff, displacement and generation-front movement; preserve deterministic bounded edits.
