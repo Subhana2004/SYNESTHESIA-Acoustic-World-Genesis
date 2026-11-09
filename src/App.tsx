@@ -10,6 +10,7 @@ import { deriveSoundTraces, type SoundTrace } from './world/soundTraces'
 import { WorldMap } from './world/WorldMap'
 import type { TerrainInspection } from './world/WorldScene'
 import { discoverWorldLandmarks, type WorldLandmark } from './world/discovery'
+import { createWorldEvent, type WorldEvent } from './world/worldEvents'
 
 const terrain = createTerrain()
 
@@ -19,6 +20,9 @@ export default function App() {
   const audio = useRef<AudioEngine | null>(null)
   const lastUpdate = useRef(0)
   const history = useRef<RecordedSculpt[]>([])
+  const eventHistory = useRef<WorldEvent[]>([])
+  const eventSequence = useRef(0)
+  const lastWorldEventAt = useRef(0)
   const pointerStart = useRef<{ x: number; y: number } | null>(null)
   const [listening, setListening] = useState(false)
   const [starting, setStarting] = useState(false)
@@ -30,6 +34,7 @@ export default function App() {
   const [nearbyTrace, setNearbyTrace] = useState<SoundTrace | null>(null)
   const [landmarks, setLandmarks] = useState<WorldLandmark[]>(() => discoverWorldLandmarks(terrain))
   const [discoveredIds, setDiscoveredIds] = useState<string[]>([])
+  const [worldEvents, setWorldEvents] = useState<WorldEvent[]>([])
   const generationProgress = Math.min(100, Math.max(0, ((terrain.frontX + terrain.worldWidth * 0.42) / (terrain.worldWidth * 0.84)) * 100))
 
   useEffect(() => {
@@ -68,6 +73,15 @@ export default function App() {
         if (terrain.frontX !== before) {
           history.current.push({ features: { ...f }, deltaSeconds: dt })
           if (history.current.length > 20000) history.current.shift()
+          if (activePattern && activePattern !== 'ambient' && now - lastWorldEventAt.current >= 7000) {
+            const event = createWorldEvent(terrain, f, activePattern, ++eventSequence.current)
+            if (event) {
+              lastWorldEventAt.current = now
+              eventHistory.current = [...eventHistory.current, event].slice(-100)
+              setWorldEvents(eventHistory.current)
+              scene.current?.updateWorldEvents(eventHistory.current)
+            }
+          }
           scene.current?.updateTerrain()
           if (history.current.length % 10 === 1) {
             scene.current?.updateSoundTraces(history.current)
@@ -131,6 +145,11 @@ export default function App() {
     setInspection(null)
     setNearbyTrace(null)
     setDiscoveredIds([])
+    eventHistory.current = []
+    eventSequence.current = 0
+    lastWorldEventAt.current = 0
+    setWorldEvents([])
+    scene.current?.updateWorldEvents([])
     const initialLandmarks = discoverWorldLandmarks(terrain)
     setLandmarks(initialLandmarks)
     scene.current?.updateDiscoveries(initialLandmarks)
@@ -187,6 +206,16 @@ export default function App() {
       })}</div>
     </section>
 
+    <section className="world-event-journal">
+      <div className="journal-heading"><div><div className="eyebrow">WORLD PHENOMENA</div><h2>Event journal</h2></div><span>{worldEvents.length} / 100 RECORDED</span></div>
+      {worldEvents.length ? <div className="event-list">{worldEvents.slice().reverse().slice(0, 6).map(event => <article className={`event-entry event-${event.kind}`} key={event.id}>
+        <span>{event.biome.toUpperCase()} · {event.kind.replaceAll('-', ' ').toUpperCase()}</span>
+        <strong>{event.kind === 'meteor-shower' ? 'Meteor shower' : event.kind === 'aurora' ? 'Highland aurora' : event.kind === 'echo-bloom' ? 'Echo bloom' : 'Mire lights'}</strong>
+        <small>INTENSITY {Math.round(event.intensity * 100)}% · WORLD POSITION {event.x.toFixed(1)}, {event.z.toFixed(1)}</small>
+      </article>)}</div> : <p className="event-empty">No rare phenomena recorded yet. Strong accents, sustained high tones and steady rhythms can awaken events in the right biome.</p>}
+      <p className="event-footnote">Events leave persistent markers in this world. Up to 100 are kept in its local journal.</p>
+    </section>
+
     <section className="panel">
       <div className="instrument">
         <div className="eyebrow">THE ACOUSTIC INSTRUMENT</div>
@@ -198,7 +227,7 @@ export default function App() {
           <button className="secondary" onClick={reset}>Reset world</button>
         </div>
       </div>
-      <WorldMemory terrain={terrain} history={history} discoveredIds={discoveredIds} stop={stop} onWorldChange={(count, restoredDiscoveredIds = []) => {
+      <WorldMemory terrain={terrain} history={history} discoveredIds={discoveredIds} events={worldEvents} stop={stop} onWorldChange={(count, restoredDiscoveredIds = [], restoredEvents = []) => {
         scene.current?.updateTerrain()
         scene.current?.clearInspection()
         scene.current?.updateSoundTraces(history.current)
@@ -210,6 +239,11 @@ export default function App() {
         setInspection(null)
         setNearbyTrace(null)
         setDiscoveredIds(restoredDiscoveredIds)
+        eventHistory.current = restoredEvents
+        eventSequence.current = restoredEvents.length
+        lastWorldEventAt.current = performance.now()
+        setWorldEvents(restoredEvents)
+        scene.current?.updateWorldEvents(restoredEvents)
         const restoredLandmarks = discoverWorldLandmarks(terrain, deriveSoundTraces(terrain, history.current))
         setLandmarks(restoredLandmarks)
         scene.current?.updateDiscoveries(restoredLandmarks)
