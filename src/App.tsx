@@ -51,6 +51,7 @@ export default function App() {
           history.current.push({ features: { ...f }, deltaSeconds: dt })
           if (history.current.length > 20000) history.current.shift()
           scene.current?.updateTerrain()
+          scene.current?.updateSoundTraces(history.current)
           scene.current?.updateAcousticAtmosphere(mapAtmosphere(f), terrain.frontX)
           setUpdates(v => v + 1)
         }
@@ -70,6 +71,7 @@ export default function App() {
     terrain.frontX = fresh.frontX
     lastUpdate.current = 0
     scene.current?.updateTerrain()
+    scene.current?.updateSoundTraces([])
     scene.current?.updateAcousticAtmosphere({ spectralBlend: 0.35, onsetPulse: 0, energy: 0, pitchTone: 0.35 }, terrain.frontX)
     setUpdates(0)
     setFeatures(null)
@@ -112,6 +114,7 @@ export default function App() {
       </div>
       <WorldMemory terrain={terrain} history={history} stop={stop} onWorldChange={(count) => {
         scene.current?.updateTerrain()
+        scene.current?.updateSoundTraces(history.current)
         scene.current?.updateAcousticAtmosphere({ spectralBlend: 0.35, onsetPulse: 0, energy: 0, pitchTone: 0.35 }, terrain.frontX)
         scene.current?.resetCamera()
         setUpdates(count)
