@@ -10,7 +10,7 @@ Last updated: 2026-11-10
 | M1 — Audio foundation | In progress | Browser microphone capture and initial feature extraction scaffolded; automated verification still needs confirmation |
 | M2 — Acoustic terrain genesis | Initial implementation in progress | Hybrid landforms, dark renderer palette, sound-reactive teal/violet lighting and onset accents committed |
 | M3 — Persistence and replay | Initial implementation in progress | IndexedDB save/load, visual world gallery, rename/delete, portable JSON export/import and deterministic feature-stream replay committed; browser validation pending |
-| M4 — Environment construction | Not started | Extended materials, vegetation, water, clouds and biomes remain outstanding |
+| M4 — Environment construction | Initial implementation in progress | Seeded bioluminescent flora, floating rock formations and drifting cloud clusters added; biome variation and browser visual review remain outstanding |
 | M5 — Visual and interaction refinement | Not started | Accessibility, responsive controls and performance profiling remain outstanding |
 | M6 — Integration and validation | Not started | Full browser/device validation remains outstanding |
 
