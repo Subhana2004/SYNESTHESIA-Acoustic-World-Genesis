@@ -40,6 +40,12 @@ export class WorldScene {
   private clouds: THREE.Group
   private soundRipples: THREE.Mesh[] = []
   private targetPitchTone = 0.35
+  private soundMotes: THREE.Points
+  private motePositions: Float32Array
+  private motePhases: Float32Array
+  private moteAngles: Float32Array
+  private moteRadii: Float32Array
+  private moteMaterial: THREE.PointsMaterial
 
   constructor(private host: HTMLDivElement, private terrain: TerrainState) {
     this.scene.background = new THREE.Color('#080a12')
@@ -74,6 +80,26 @@ export class WorldScene {
     this.accentLight = new THREE.PointLight('#55d6c2', 0, 18, 2)
     this.accentLight.position.set(0, 2.5, 0)
     this.scene.add(this.accentLight)
+
+    // A fixed-size mote field creates a soft burst around each incoming sound accent.
+    const moteCount = 112
+    this.motePositions = new Float32Array(moteCount * 3)
+    this.motePhases = new Float32Array(moteCount)
+    this.moteAngles = new Float32Array(moteCount)
+    this.moteRadii = new Float32Array(moteCount)
+    for (let i = 0; i < moteCount; i++) {
+      this.motePhases[i] = random() * Math.PI * 2
+      this.moteAngles[i] = random() * Math.PI * 2
+      this.moteRadii[i] = 0.7 + random() * 3.8
+    }
+    const moteGeometry = new THREE.BufferGeometry()
+    moteGeometry.setAttribute('position', new THREE.BufferAttribute(this.motePositions, 3))
+    this.moteMaterial = new THREE.PointsMaterial({
+      color: '#69d8cb', size: 0.09, transparent: true, opacity: 0.12,
+      depthWrite: false, sizeAttenuation: true,
+    })
+    this.soundMotes = new THREE.Points(moteGeometry, this.moteMaterial)
+    this.scene.add(this.soundMotes)
 
     // Expanding wavefronts visualise accents at the active generation point.
     for (let i = 0; i < 3; i++) {
@@ -433,6 +459,21 @@ export class WorldScene {
     this.currentPulse = THREE.MathUtils.lerp(this.currentPulse, this.targetPulse, 0.22)
     this.currentPaletteBlend = THREE.MathUtils.lerp(this.currentPaletteBlend, this.targetPaletteBlend, 0.025)
     this.currentBiomeEnergy = THREE.MathUtils.lerp(this.currentBiomeEnergy, this.targetBiomeEnergy, 0.04)
+    this.soundMotes.position.set(this.targetAccentX, 0.2, this.targetAccentZ)
+    this.moteMaterial.color.set('#55d6c2').lerp(new THREE.Color('#a58cff'), this.currentPaletteBlend)
+    this.moteMaterial.opacity = 0.08 + this.currentBiomeEnergy * 0.42 + this.currentPulse * 0.24
+    this.moteMaterial.size = 0.045 + this.currentBiomeEnergy * 0.1 + this.currentPulse * 0.12
+    const moteAttribute = this.soundMotes.geometry.attributes.position as THREE.BufferAttribute
+    for (let i = 0; i < this.motePhases.length; i++) {
+      const phase = this.motePhases[i] + time * (0.32 + this.targetPitchTone * 0.55)
+      const radius = this.moteRadii[i] + this.currentPulse * (1.2 + this.targetPitchTone)
+      const angle = this.moteAngles[i] + phase * 0.22
+      const offset = i * 3
+      this.motePositions[offset] = Math.cos(angle) * radius
+      this.motePositions[offset + 1] = 0.25 + Math.sin(phase * 1.7) * (0.18 + this.currentBiomeEnergy * 0.6)
+      this.motePositions[offset + 2] = Math.sin(angle) * radius
+    }
+    moteAttribute.needsUpdate = true
     this.soundRipples.forEach(ring => {
       const phase = (time * (0.42 + this.targetPitchTone * 0.48) + Number(ring.userData.phase)) % 1
       const envelope = 1 - phase
@@ -508,6 +549,8 @@ export class WorldScene {
     this.controls.dispose()
     this.geometry.dispose()
     this.water.geometry.dispose()
+    this.soundMotes.geometry.dispose()
+    this.moteMaterial.dispose()
     this.soundRipples.forEach(ring => {
       ring.geometry.dispose()
       ;(ring.material as THREE.Material).dispose()
