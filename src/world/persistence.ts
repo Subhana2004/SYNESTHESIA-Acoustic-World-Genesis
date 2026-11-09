@@ -78,6 +78,7 @@ export async function loadWorld(id: string): Promise<SavedWorld | undefined> {
     const record = await requestResult<SavedWorld | undefined>(db.transaction(STORE, 'readonly').objectStore(STORE).get(id))
     if (!record || record.version !== 1 || !Array.isArray(record.heights) ||
       record.heights.length !== record.size * record.size ||
+      !Array.isArray(record.history) ||
       !record.history.every(item => Number.isFinite(item.deltaSeconds) && item.features &&
         Number.isFinite(item.features.rms) && Number.isFinite(item.features.timestamp))) {
       throw new Error('This saved world is invalid or uses an unsupported format.')
