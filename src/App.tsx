@@ -16,6 +16,7 @@ export default function App() {
   const lastUpdate = useRef(0)
   const history = useRef<RecordedSculpt[]>([])
   const [listening, setListening] = useState(false)
+  const [starting, setStarting] = useState(false)
   const [error, setError] = useState('')
   const [features, setFeatures] = useState<AcousticFeatures | null>(null)
   const [updates, setUpdates] = useState(0)
@@ -33,10 +34,13 @@ export default function App() {
     audio.current?.stop()
     audio.current = null
     setListening(false)
+    setStarting(false)
   }, [])
   useEffect(() => () => { audio.current?.stop() }, [])
 
   const start = async () => {
+    if (starting || listening) return
+    setStarting(true)
     setError('')
     const engine = new AudioEngine()
     audio.current = engine
@@ -65,6 +69,8 @@ export default function App() {
       engine.stop()
       audio.current = null
       setError(e instanceof Error ? e.message : 'Unable to start microphone input.')
+    } finally {
+      setStarting(false)
     }
   }
 
@@ -113,7 +119,7 @@ export default function App() {
         <p>{listening ? 'Change your pitch, volume, and rhythm. The terrain will keep what you create.' : 'Microphone access starts only when you choose. No speech recognition, no uploads.'}</p>
         {error && <p className="error" role="alert">{error}</p>}
         <div className="actions">
-          {!listening ? <button className="primary" onClick={start}><i /> Begin listening</button> : <button className="primary pause" onClick={stop}><i /> Pause input</button>}
+          {!listening ? <button className="primary" onClick={start} disabled={starting}><i /> {starting ? 'Requesting microphone…' : 'Begin listening'}</button> : <button className="primary pause" onClick={stop}><i /> Pause input</button>}
           <button className="secondary" onClick={reset}>Reset world</button>
         </div>
       </div>
