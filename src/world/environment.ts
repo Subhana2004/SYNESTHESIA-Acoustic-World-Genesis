@@ -1,6 +1,10 @@
 import type { TerrainState } from './terrain'
+import { getBiomeWeights } from './biomes'
+
+export type BiomeKind = 'mire' | 'forest' | 'highlands'
 
 export interface FloraPlacement {
+  biome: BiomeKind
   x: number
   y: number
   z: number
@@ -59,7 +63,11 @@ export function generateEnvironmentLayout(terrain: TerrainState): EnvironmentLay
     if (Math.hypot(x - terrain.worldWidth * 0.06, z - terrain.worldWidth * 0.04) < 5.1) continue
     const y = sampleHeight(terrain, x, z)
     if (y < 0.08 || y > 2.15) continue
-    flora.push({ x, y, z, scale: 0.65 + random() * 0.75, hue: random() })
+    const weights = getBiomeWeights(y)
+    const biome: BiomeKind = weights.mire >= weights.forest && weights.mire >= weights.highlands
+      ? 'mire'
+      : weights.forest >= weights.highlands ? 'forest' : 'highlands'
+    flora.push({ biome, x, y, z, scale: 0.65 + random() * 0.75, hue: random() })
   }
 
   const floatingRocks: FloatingRockPlacement[] = []
