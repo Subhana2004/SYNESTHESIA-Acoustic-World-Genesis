@@ -25,6 +25,17 @@ describe('pitch estimation', () => {
     expect(result.pitchHz as number).toBeGreaterThan(425)
     expect(result.pitchHz as number).toBeLessThan(455)
   })
+
+  it('tracks the lower and upper edges of the supported pitch band', () => {
+    const low = estimatePitch(sine(65), 48000)
+    const high = estimatePitch(sine(880), 48000)
+    expect(low.pitchHz).not.toBeNull()
+    expect(low.pitchHz as number).toBeGreaterThan(60)
+    expect(low.pitchHz as number).toBeLessThan(70)
+    expect(high.pitchHz).not.toBeNull()
+    expect(high.pitchHz as number).toBeGreaterThan(850)
+    expect(high.pitchHz as number).toBeLessThan(910)
+  })
   it('does not invent pitch for silence', () => {
     expect(estimatePitch(new Float32Array(2048), 48000).pitchHz).toBeNull()
   })
