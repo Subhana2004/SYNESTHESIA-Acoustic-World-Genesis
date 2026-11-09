@@ -74,3 +74,14 @@ export function terrainChecksum(t: TerrainState): number {
   for (let i = 0; i < t.heights.length; i++) { hash ^= Math.round(t.heights[i] * 10000); hash = Math.imul(hash, 16777619) }
   return hash >>> 0
 }
+
+export function replayTerrain(
+  seed: number,
+  size: number,
+  worldWidth: number,
+  history: Array<{ features: AcousticFeatures; deltaSeconds: number }>,
+): TerrainState {
+  const terrain = createTerrain(size, worldWidth, seed)
+  for (const event of history) sculptTerrain(terrain, event.features, event.deltaSeconds)
+  return terrain
+}
