@@ -174,6 +174,7 @@ export default function App() {
   }
 
   return <main className="shell">
+    <a className="skip-link" href="#acoustic-instrument">Skip to audio controls</a>
     <header className="topbar">
       <a className="brand" href="#"><span className="brand-mark">S</span>SYNESTHESIA</a>
       <span className="top-note">ACOUSTIC WORLD GENESIS <i /> EXPERIMENT 001</span>
@@ -188,7 +189,7 @@ export default function App() {
 
     <section className="world">
       <div className="world-head"><span>WORLD / 001</span><span className={listening ? 'live' : ''}><i /> {listening ? 'LISTENING' : 'WORLD AT REST'} · {soundPattern.toUpperCase()}</span></div>
-      <div className="viewport" ref={viewport} onPointerDown={event => { pointerStart.current = { x: event.clientX, y: event.clientY } }} onPointerUp={event => { const startPoint = pointerStart.current; pointerStart.current = null; if (!startPoint || Math.hypot(event.clientX - startPoint.x, event.clientY - startPoint.y) > 7) return; const landmarkId = scene.current?.pickDiscoveryAt(event.clientX, event.clientY); if (landmarkId) { discoverLandmark(landmarkId); return } const eventId = scene.current?.pickWorldEventAt(event.clientX, event.clientY); if (eventId) { const worldEvent = worldEvents.find(item => item.id === eventId); if (worldEvent) inspectLocation(worldEvent.x, worldEvent.z); return } const result = scene.current?.inspectAt(event.clientX, event.clientY); if (result) inspectLocation(result.x, result.z) }}>
+      <div className="viewport" ref={viewport} role="region" aria-label="Interactive three-dimensional sound world. Drag to orbit, use the camera buttons to zoom, or select a place to inspect it." onPointerDown={event => { pointerStart.current = { x: event.clientX, y: event.clientY } }} onPointerUp={event => { const startPoint = pointerStart.current; pointerStart.current = null; if (!startPoint || Math.hypot(event.clientX - startPoint.x, event.clientY - startPoint.y) > 7) return; const landmarkId = scene.current?.pickDiscoveryAt(event.clientX, event.clientY); if (landmarkId) { discoverLandmark(landmarkId); return } const eventId = scene.current?.pickWorldEventAt(event.clientX, event.clientY); if (eventId) { const worldEvent = worldEvents.find(item => item.id === eventId); if (worldEvent) inspectLocation(worldEvent.x, worldEvent.z); return } const result = scene.current?.inspectAt(event.clientX, event.clientY); if (result) inspectLocation(result.x, result.z) }}>
         <div className="hint">DRAG TO ORBIT · SCROLL TO EXPLORE</div>
         <div className="view-controls" aria-label="Camera controls" onPointerDown={event => event.stopPropagation()}><button className="view-reset" onClick={() => scene.current?.zoomBy(0.82)} aria-label="Zoom in">+</button><button className="view-reset" onClick={() => scene.current?.zoomBy(1.22)} aria-label="Zoom out">−</button><button className="view-reset" onClick={() => scene.current?.resetCamera()} aria-label="Reset camera view">RESET</button></div>
         <div className="coords">X {terrain.frontX.toFixed(1)} · SEED {terrain.seed}</div>
@@ -234,7 +235,7 @@ export default function App() {
       <p className="event-footnote">Select a journal entry or its 3D marker to inspect where it occurred. Up to 100 are kept in this world.</p>
     </section>
 
-    <section className="panel">
+    <section className="panel" id="acoustic-instrument">
       <div className="instrument">
         <div className="eyebrow">THE ACOUSTIC INSTRUMENT</div>
         <h2>{listening ? 'Your world is listening.' : 'Make the first sound.'}</h2>
