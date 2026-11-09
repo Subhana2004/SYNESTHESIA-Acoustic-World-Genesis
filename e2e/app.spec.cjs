@@ -20,6 +20,20 @@ test('renders the 3D world and the core instrument interface', async ({ page }, 
   expect(pageErrors).toEqual([])
 })
 
+
+test('shows a useful fallback when WebGL is unavailable', async ({ page }) => {
+  await page.addInitScript(() => {
+    const nativeGetContext = HTMLCanvasElement.prototype.getContext
+    HTMLCanvasElement.prototype.getContext = function (type, ...args) {
+      if (type === 'webgl2' || type === 'webgl' || type === 'experimental-webgl') return null
+      return nativeGetContext.call(this, type, ...args)
+    }
+  })
+  await page.goto('/')
+  await expect(page.getByRole('alert')).toContainText(/could not initialise the 3D world/i)
+  await expect(page.getByRole('button', { name: /Begin listening/i })).toBeDisabled()
+})
+
 test('supports keyboard exploration through the biome minimap', async ({ page }) => {
   await page.goto('/')
   const map = page.locator('.world-map')
