@@ -12,7 +12,7 @@ Last updated: 2026-11-10
 | M3 — Persistence and replay | Complete | IndexedDB gallery, save/load, rename/delete, deterministic feature replay, validated JSON import/export and per-world discovery/event state |
 | M4 — Environment construction | Complete | Three elevation biomes, biome-specific flora, floating rocks, clouds, mist, water, sound waves, motes, sound traces and procedural phenomena |
 | M5 — Visual and interaction refinement | Complete | Responsive controls, camera tools, minimap, field notes, landmark discovery, event journal, keyboard exploration, per-world statistics and resource lifecycle fixes |
-| M6 — Integration and validation | In progress | Unit/build CI is established; Playwright desktop/mobile browser smoke tests have been added and await the first full CI result |
+| M6 — Integration and validation | Automated checks complete; device QA outstanding | 57 unit tests, production build, production dependency audit and 16 Playwright desktop/mobile checks pass in GitHub Actions; physical-device checks remain |
 
 ## Current feature set
 
@@ -52,7 +52,9 @@ Last updated: 2026-11-10
 - Reset acoustic-pattern state between worlds.
 - Hardened microphone startup cancellation, including permission prompts that resolve after a reset or component unmount.
 - Added keyboard arrow navigation to the minimap and visible keyboard focus styles.
-- Added Playwright checks for rendering, camera controls, minimap navigation, microphone permission failure/success, mobile overflow, and world save/export/import/load/rename/delete.
+- Added Playwright checks for rendering, WebGL fallback, camera controls, keyboard minimap navigation, microphone permission failure/success, mobile overflow, and world save/export/import/load/rename/delete—including a different-seed import with a saved phenomenon.
+- Lazy-loaded the Three.js world renderer and split React, Three.js core and Three.js controls into separate bundles; the initial interface bundle is substantially smaller.
+- Capped visible 3D phenomena markers at 32 while retaining up to 100 events in the saved journal.
 
 ## Verification
 
