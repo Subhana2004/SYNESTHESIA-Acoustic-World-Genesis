@@ -6,6 +6,9 @@ import { WorldScene } from './world/WorldScene'
 import { WorldMemory } from './world/WorldMemory'
 import type { RecordedSculpt } from './world/persistence'
 import type { SoundPattern } from './world/soundPatterns'
+import { deriveSoundTraces, type SoundTrace } from './world/soundTraces'
+import { WorldMap } from './world/WorldMap'
+import type { TerrainInspection } from './world/WorldScene'
 
 const terrain = createTerrain()
 
@@ -15,12 +18,15 @@ export default function App() {
   const audio = useRef<AudioEngine | null>(null)
   const lastUpdate = useRef(0)
   const history = useRef<RecordedSculpt[]>([])
+  const pointerStart = useRef<{ x: number; y: number } | null>(null)
   const [listening, setListening] = useState(false)
   const [starting, setStarting] = useState(false)
   const [error, setError] = useState('')
   const [features, setFeatures] = useState<AcousticFeatures | null>(null)
   const [updates, setUpdates] = useState(0)
   const [soundPattern, setSoundPattern] = useState<SoundPattern>('ambient')
+  const [inspection, setInspection] = useState<TerrainInspection | null>(null)
+  const [nearbyTrace, setNearbyTrace] = useState<SoundTrace | null>(null)
   const generationProgress = Math.min(100, Math.max(0, ((terrain.frontX + terrain.worldWidth * 0.42) / (terrain.worldWidth * 0.84)) * 100))
 
   useEffect(() => {
@@ -74,6 +80,18 @@ export default function App() {
     }
   }
 
+  const inspectLocation = (x: number, z: number) => {
+    const result = scene.current?.inspectWorldPoint(x, z)
+    if (!result) return
+    setInspection(result)
+    const traces = deriveSoundTraces(terrain, history.current)
+    const nearest = traces.reduce<{ trace: SoundTrace; distance: number } | null>((best, trace) => {
+      const distance = Math.hypot(trace.x - result.x, trace.z - result.z)
+      return !best || distance < best.distance ? { trace, distance } : best
+    }, null)
+    setNearbyTrace(nearest && nearest.distance <= 3.5 ? nearest.trace : null)
+  }
+
   const reset = () => {
     stop()
     const fresh = createTerrain()
@@ -86,6 +104,8 @@ export default function App() {
     setUpdates(0)
     setFeatures(null)
     setSoundPattern('ambient')
+    setInspection(null)
+    setNearbyTrace(null)
     history.current = []
   }
 
@@ -104,13 +124,20 @@ export default function App() {
 
     <section className="world">
       <div className="world-head"><span>WORLD / 001</span><span className={listening ? 'live' : ''}><i /> {listening ? 'LISTENING' : 'WORLD AT REST'} · {soundPattern.toUpperCase()}</span></div>
-      <div className="viewport" ref={viewport}>
+      <div className="viewport" ref={viewport} onPointerDown={event => { pointerStart.current = { x: event.clientX, y: event.clientY } }} onPointerUp={event => { const startPoint = pointerStart.current; pointerStart.current = null; if (!startPoint || Math.hypot(event.clientX - startPoint.x, event.clientY - startPoint.y) > 7) return; const result = scene.current?.inspectAt(event.clientX, event.clientY); if (result) { setInspection(result); const traces = deriveSoundTraces(terrain, history.current); const nearest = traces.reduce<{ trace: SoundTrace; distance: number } | null>((best, trace) => { const distance = Math.hypot(trace.x - result.x, trace.z - result.z); return !best || distance < best.distance ? { trace, distance } : best }, null); setNearbyTrace(nearest && nearest.distance <= 3.5 ? nearest.trace : null) } }}>
         <div className="hint">DRAG TO ORBIT · SCROLL TO EXPLORE</div>
-        <div className="view-controls" aria-label="Camera controls"><button className="view-reset" onClick={() => scene.current?.zoomBy(0.82)} aria-label="Zoom in">+</button><button className="view-reset" onClick={() => scene.current?.zoomBy(1.22)} aria-label="Zoom out">−</button><button className="view-reset" onClick={() => scene.current?.resetCamera()} aria-label="Reset camera view">RESET</button></div>
+        <div className="view-controls" aria-label="Camera controls" onPointerDown={event => event.stopPropagation()}><button className="view-reset" onClick={() => scene.current?.zoomBy(0.82)} aria-label="Zoom in">+</button><button className="view-reset" onClick={() => scene.current?.zoomBy(1.22)} aria-label="Zoom out">−</button><button className="view-reset" onClick={() => scene.current?.resetCamera()} aria-label="Reset camera view">RESET</button></div>
         <div className="coords">X {terrain.frontX.toFixed(1)} · SEED {terrain.seed}</div>
       </div>
       <div className="world-foot"><span>AN EXPLORABLE RECORD OF YOUR SOUND</span><span>{String(updates).padStart(4, '0')} SCULPT UPDATES</span></div><div className="generation-track" role="progressbar" aria-label="World generation progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(generationProgress)}><div className="generation-fill" style={{ width: generationProgress + '%' }} /></div><div className="generation-caption"><span>GENERATION FRONT</span><span>{Math.round(generationProgress)}% EXPLORED</span></div>
     </section>
+    <div className="exploration-layout">
+      <WorldMap terrain={terrain} revision={updates} selected={inspection} onSelect={inspectLocation} />
+      <section className="inspection-panel" aria-live="polite">
+        <div className="eyebrow">FIELD NOTES</div>
+        {inspection ? <><h3>{inspection.biome.toUpperCase()} REGION</h3><p>Elevation <strong>{inspection.elevation.toFixed(2)}</strong></p><p>World position <strong>{inspection.x.toFixed(1)}, {inspection.z.toFixed(1)}</strong></p>{nearbyTrace ? <div className="landmark-note"><span>NEARBY SOUND LANDMARK</span><strong>{nearbyTrace.kind.toUpperCase()} SIGNATURE</strong><small>Intensity {Math.round(nearbyTrace.strength * 100)}% · derived from your acoustic history</small></div> : <p className="inspection-muted">No recorded sound landmark nearby. Create more sound to leave traces in this region.</p>}</> : <><h3>Choose a place to explore.</h3><p>Click the terrain or select a region on the minimap to inspect its biome, elevation and nearby sound traces.</p></>}
+      </section>
+    </div>
 
     <section className="panel">
       <div className="instrument">
@@ -131,6 +158,8 @@ export default function App() {
         setUpdates(count)
         setFeatures(null)
         setSoundPattern('ambient')
+        setInspection(null)
+        setNearbyTrace(null)
       }} />
       <div className="readouts" aria-live="polite">
         <div><span>FUNDAMENTAL / HZ</span><strong>{features?.pitchHz ? Math.round(features.pitchHz) : '—'}</strong><small>{features?.pitchHz ? 'CONFIDENCE ' + Math.round(features.pitchConfidence * 100) + '%' : 'NO STABLE PITCH'}</small></div>
