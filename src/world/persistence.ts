@@ -169,6 +169,7 @@ export function snapshotWorld(
   name: string,
   history: RecordedSculpt[],
   discoveredLandmarkIds: string[] = [],
+  events: WorldEvent[] = [],
 ): SavedWorld {
   return {
     id: globalThis.crypto?.randomUUID?.() ?? `world-${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -182,7 +183,7 @@ export function snapshotWorld(
     heights: Array.from(terrain.heights),
     history: history.map(item => ({ features: { ...item.features }, deltaSeconds: item.deltaSeconds })),
     discoveredLandmarkIds: [...new Set(discoveredLandmarkIds.filter(id => ['basin', 'summit', 'grove', 'echo'].includes(id)))],
-    events: [],
+    events: validateWorldEvents(events),
   }
 }
 
