@@ -15,7 +15,26 @@ export interface AcousticControls {
   pitchAvailable: boolean
 }
 
+export interface AtmosphereControls {
+  spectralBlend: number
+  onsetPulse: number
+  energy: number
+}
+
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v))
+
+export function mapAtmosphere(f: AcousticFeatures): AtmosphereControls {
+  // A logarithmic range gives useful control across low and high spectral-centroid values.
+  const minHz = 250
+  const maxHz = 6000
+  const safeCentroid = clamp(f.spectralCentroidHz, minHz, maxHz)
+  const spectralBlend = clamp(Math.log(safeCentroid / minHz) / Math.log(maxHz / minHz), 0, 1)
+  return {
+    spectralBlend,
+    onsetPulse: f.isSilent ? 0 : clamp(f.onsetStrength, 0, 1),
+    energy: f.isSilent ? 0 : clamp((f.rms - 0.012) / 0.22, 0, 1),
+  }
+}
 
 export function estimatePitch(samples: Float32Array, sampleRate: number): { pitchHz: number | null; confidence: number } {
   const n = samples.length
