@@ -21,6 +21,11 @@ export class WorldScene {
   private currentPulse = 0
   private targetAccentX = 0
   private targetAccentZ = 0
+  private mist: THREE.Points
+  private mistPositions: Float32Array
+  private mistPhases: Float32Array
+  private stars: THREE.Points
+  private crystals: THREE.Group
 
   constructor(private host: HTMLDivElement, private terrain: TerrainState) {
     this.scene.background = new THREE.Color('#080a12')
@@ -53,6 +58,47 @@ export class WorldScene {
     this.accentLight.position.set(0, 2.5, 0)
     this.scene.add(this.accentLight)
 
+    // Lightweight point sprites provide drifting valley mist without a particle-system dependency.
+    const mistCount = 260
+    this.mistPositions = new Float32Array(mistCount * 3)
+    this.mistPhases = new Float32Array(mistCount)
+    let randomState = terrain.seed >>> 0
+    const random = () => {
+      randomState = (1664525 * randomState + 1013904223) >>> 0
+      return randomState / 4294967296
+    }
+    for (let i = 0; i < mistCount; i++) {
+      this.mistPositions[i * 3] = (random() - 0.5) * terrain.worldWidth
+      this.mistPositions[i * 3 + 1] = 0.45 + random() * 2.4
+      this.mistPositions[i * 3 + 2] = (random() - 0.5) * terrain.worldWidth
+      this.mistPhases[i] = random() * Math.PI * 2
+    }
+    const mistGeometry = new THREE.BufferGeometry()
+    mistGeometry.setAttribute('position', new THREE.BufferAttribute(this.mistPositions, 3))
+    const mistMaterial = new THREE.PointsMaterial({
+      color: '#8b9dc7', size: 0.22, transparent: true, opacity: 0.2,
+      depthWrite: false, sizeAttenuation: true,
+    })
+    this.mist = new THREE.Points(mistGeometry, mistMaterial)
+    this.scene.add(this.mist)
+
+    const starPositions: number[] = []
+    for (let i = 0; i < 420; i++) {
+      const angle = random() * Math.PI * 2
+      const radius = 48 + random() * 38
+      starPositions.push(Math.cos(angle) * radius, 13 + random() * 28, Math.sin(angle) * radius)
+    }
+    const starGeometry = new THREE.BufferGeometry()
+    starGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starPositions, 3))
+    this.stars = new THREE.Points(starGeometry, new THREE.PointsMaterial({
+      color: '#c4c9e8', size: 0.16, transparent: true, opacity: 0.72,
+      depthWrite: false, sizeAttenuation: true,
+    }))
+    this.scene.add(this.stars)
+
+    this.crystals = this.createRidgeCrystals()
+    this.scene.add(this.crystals)
+
     this.geometry = new THREE.PlaneGeometry(terrain.worldWidth, terrain.worldWidth, terrain.size - 1, terrain.size - 1)
     this.geometry.rotateX(-Math.PI / 2)
     this.geometry.setAttribute('color', new THREE.Float32BufferAttribute(this.vertexColors(), 3))
@@ -76,6 +122,50 @@ export class WorldScene {
     this.targetAccentZ = Math.sin((this.targetAccentX + this.terrain.worldWidth / 2) * 0.11) * 2.5
     const accentColor = new THREE.Color('#55d6c2').lerp(new THREE.Color('#9b7bff'), blend)
     this.accentLight.color.copy(accentColor)
+  }
+
+  private createRidgeCrystals(): THREE.Group {
+    const group = new THREE.Group()
+    const candidates: Array<{ x: number; z: number; y: number }> = []
+    const stride = 3
+    for (let row = 1; row < this.terrain.size - 1; row += stride) {
+      for (let col = 1; col < this.terrain.size - 1; col += stride) {
+        const index = row * this.terrain.size + col
+        const height = this.terrain.heights[index]
+        if (height < 1.05) continue
+        const x = (col / (this.terrain.size - 1) - 0.5) * this.terrain.worldWidth
+        const z = (row / (this.terrain.size - 1) - 0.5) * this.terrain.worldWidth
+        candidates.push({ x, z, y: height })
+      }
+    }
+    candidates.sort((a, b) => b.y - a.y)
+    const chosen: typeof candidates = []
+    for (const candidate of candidates) {
+      if (chosen.every(other => Math.hypot(other.x - candidate.x, other.z - candidate.z) > 4.2)) {
+        chosen.push(candidate)
+      }
+      if (chosen.length >= 18) break
+    }
+
+    const teal = new THREE.MeshStandardMaterial({
+      color: '#55d6c2', emissive: '#168d82', emissiveIntensity: 1.25,
+      roughness: 0.34, metalness: 0.18,
+    })
+    const violet = new THREE.MeshStandardMaterial({
+      color: '#a58cff', emissive: '#5638a8', emissiveIntensity: 1.35,
+      roughness: 0.3, metalness: 0.2,
+    })
+    chosen.forEach((point, index) => {
+      const height = 0.55 + (index % 4) * 0.22
+      const crystal = new THREE.Mesh(
+        new THREE.ConeGeometry(0.16 + (index % 3) * 0.045, height, 5),
+        index % 3 === 0 ? violet : teal,
+      )
+      crystal.position.set(point.x, point.y + height * 0.42, point.z)
+      crystal.rotation.z = (index % 2 ? 1 : -1) * 0.12
+      group.add(crystal)
+    })
+    return group
   }
 
   private terrainColor(height: number): THREE.Color {
@@ -131,6 +221,17 @@ export class WorldScene {
     this.targetPulse *= 0.9
     this.accentLight.intensity = this.currentPulse * 5.5
     this.accentLight.position.set(this.targetAccentX, 2.5, this.targetAccentZ)
+    const mistPositions = this.mist.geometry.attributes.position as THREE.BufferAttribute
+    for (let i = 0; i < this.mistPhases.length; i++) {
+      const offset = i * 3
+      this.mistPositions[offset] += Math.sin(time * 2 + this.mistPhases[i]) * 0.0018
+      this.mistPositions[offset + 1] += Math.sin(time * 1.4 + this.mistPhases[i]) * 0.0012
+      if (this.mistPositions[offset] > this.terrain.worldWidth / 2) this.mistPositions[offset] = -this.terrain.worldWidth / 2
+      if (this.mistPositions[offset] < -this.terrain.worldWidth / 2) this.mistPositions[offset] = this.terrain.worldWidth / 2
+    }
+    mistPositions.needsUpdate = true
+    this.mist.rotation.y = Math.sin(time * 0.35) * 0.025
+    this.stars.rotation.y = time * 0.018
     this.controls.update()
     this.renderer.render(this.scene, this.camera)
   }
@@ -141,6 +242,22 @@ export class WorldScene {
     window.removeEventListener('resize', this.resize)
     this.controls.dispose()
     this.geometry.dispose()
+    this.mist.geometry.dispose()
+    ;(this.mist.material as THREE.Material).dispose()
+    this.stars.geometry.dispose()
+    ;(this.stars.material as THREE.Material).dispose()
+    this.crystals.traverse(object => {
+      if (object instanceof THREE.Mesh) object.geometry.dispose()
+    })
+    const crystalMaterials = new Set<THREE.Material>()
+    this.crystals.traverse(object => {
+      if (object instanceof THREE.Mesh) {
+        const material = object.material
+        if (Array.isArray(material)) material.forEach(item => crystalMaterials.add(item))
+        else crystalMaterials.add(material)
+      }
+    })
+    crystalMaterials.forEach(material => material.dispose())
     ;(this.mesh.material as THREE.Material).dispose()
     this.renderer.dispose()
     this.renderer.domElement.remove()
