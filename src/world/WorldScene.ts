@@ -6,6 +6,7 @@ import { generateEnvironmentLayout } from './environment'
 import { getBiomeWeights } from './biomes'
 import { updateSoundPattern, type SoundPattern, type SoundPatternState } from './soundPatterns'
 import { deriveSoundTraces, type TraceEvent } from './soundTraces'
+import type { WorldLandmark } from './discovery'
 
 export interface TerrainInspection { x: number; z: number; elevation: number; biome: 'mire' | 'forest' | 'highlands' }
 
@@ -55,6 +56,7 @@ export class WorldScene {
   private soundPattern: SoundPattern = 'ambient'
   private rhythmStrength = 0
   private traceGroup = new THREE.Group()
+  private discoveryGroup = new THREE.Group()
   private readonly tealColor = new THREE.Color('#55d6c2')
   private readonly violetColor = new THREE.Color('#a58cff')
   private readonly rockBaseColor = new THREE.Color('#17152b')
@@ -125,6 +127,7 @@ export class WorldScene {
     this.soundMotes = new THREE.Points(moteGeometry, this.moteMaterial)
     this.scene.add(this.soundMotes)
     this.scene.add(this.traceGroup)
+    this.scene.add(this.discoveryGroup)
 
     // Expanding wavefronts visualise accents at the active generation point.
     for (let i = 0; i < 3; i++) {
@@ -494,6 +497,50 @@ export class WorldScene {
     return colors
   }
 
+  updateDiscoveries(landmarks: readonly WorldLandmark[]): void {
+    this.discoveryGroup.traverse(object => {
+      if (object instanceof THREE.Mesh) {
+        object.geometry.dispose()
+        const materials = Array.isArray(object.material) ? object.material : [object.material]
+        materials.forEach(material => material.dispose())
+      }
+    })
+    this.discoveryGroup.clear()
+    landmarks.forEach(landmark => {
+      const color = landmark.kind === 'basin' ? '#55d6c2'
+        : landmark.kind === 'summit' ? '#b18be5'
+          : landmark.kind === 'grove' ? '#7ed5a8' : '#f2c879'
+      const geometry = landmark.kind === 'basin'
+        ? new THREE.TorusGeometry(0.52, 0.075, 7, 28)
+        : landmark.kind === 'summit'
+          ? new THREE.OctahedronGeometry(0.48, 0)
+          : landmark.kind === 'grove'
+            ? new THREE.IcosahedronGeometry(0.42, 0)
+            : new THREE.TorusKnotGeometry(0.28, 0.08, 48, 6)
+      const material = new THREE.MeshStandardMaterial({
+        color, emissive: color, emissiveIntensity: 1.1,
+        roughness: 0.3, metalness: 0.16,
+      })
+      const marker = new THREE.Mesh(geometry, material)
+      marker.position.set(landmark.x, landmark.elevation + 0.72, landmark.z)
+      marker.userData.landmarkId = landmark.id
+      marker.userData.baseY = marker.position.y
+      this.discoveryGroup.add(marker)
+    })
+  }
+
+  pickDiscoveryAt(clientX: number, clientY: number): string | null {
+    const rect = this.renderer.domElement.getBoundingClientRect()
+    const pointer = new THREE.Vector2(
+      ((clientX - rect.left) / rect.width) * 2 - 1,
+      -((clientY - rect.top) / rect.height) * 2 + 1,
+    )
+    const raycaster = new THREE.Raycaster()
+    raycaster.setFromCamera(pointer, this.camera)
+    const hit = raycaster.intersectObjects(this.discoveryGroup.children, false)[0]
+    return hit ? String(hit.object.userData.landmarkId ?? '') || null : null
+  }
+
   clearInspection(): void {
     this.inspectionMarker.visible = false
   }
@@ -682,6 +729,12 @@ export class WorldScene {
     document.removeEventListener('visibilitychange', this.handleVisibilityChange)
     this.controls.dispose()
     this.geometry.dispose()
+    this.discoveryGroup.traverse(object => {
+      if (object instanceof THREE.Mesh) {
+        object.geometry.dispose()
+        ;(object.material as THREE.Material).dispose()
+      }
+    })
     this.inspectionMarker.geometry.dispose()
     ;(this.inspectionMarker.material as THREE.Material).dispose()
     this.updateSoundTraces([])
