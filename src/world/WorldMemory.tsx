@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { listSavedWorlds, loadWorld, restoreWorld, saveWorld, snapshotWorld } from './persistence'
-import { createTerrain, sculptTerrain, type TerrainState } from './terrain'
+import { replayTerrain, type TerrainState } from './terrain'
 import type { RecordedSculpt } from './persistence'
 
 type SavedWorldSummary = { id: string; name: string; savedAt: number; seed: number }
@@ -36,10 +36,9 @@ export function WorldMemory({ terrain, history, stop, onWorldChange }: Props) {
   const replay = () => {
     stop()
     const events = history.current.map(item => ({ features: { ...item.features }, deltaSeconds: item.deltaSeconds }))
-    const base = createTerrain(terrain.size, terrain.worldWidth, terrain.seed)
-    terrain.heights.set(base.heights)
-    terrain.frontX = base.frontX
-    for (const event of events) sculptTerrain(terrain, event.features, event.deltaSeconds)
+    const replayed = replayTerrain(terrain.seed, terrain.size, terrain.worldWidth, events)
+    terrain.heights.set(replayed.heights)
+    terrain.frontX = replayed.frontX
     onWorldChange(events.length)
     setMessage('Creation replayed from the recorded acoustic feature stream.')
   }
