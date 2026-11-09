@@ -494,6 +494,10 @@ export class WorldScene {
     return colors
   }
 
+  clearInspection(): void {
+    this.inspectionMarker.visible = false
+  }
+
   inspectAt(clientX: number, clientY: number): TerrainInspection | null {
     const rect = this.renderer.domElement.getBoundingClientRect()
     const pointer = new THREE.Vector2(
