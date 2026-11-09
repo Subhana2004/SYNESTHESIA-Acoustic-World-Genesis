@@ -26,6 +26,11 @@ export class WorldScene {
   private mistPhases: Float32Array
   private stars: THREE.Points
   private crystals: THREE.Group
+  private water: THREE.Mesh
+  private waterRing: THREE.Mesh
+  private waterMaterial: THREE.MeshStandardMaterial
+  private targetPaletteBlend = 0.35
+  private currentPaletteBlend = 0.35
 
   constructor(private host: HTMLDivElement, private terrain: TerrainState) {
     this.scene.background = new THREE.Color('#080a12')
@@ -39,6 +44,9 @@ export class WorldScene {
     host.appendChild(this.renderer.domElement)
     this.controls = new OrbitControls(this.camera, this.renderer.domElement)
     this.controls.enableDamping = true
+    this.controls.enablePan = true
+    this.controls.enableZoom = true
+    this.controls.screenSpacePanning = false
     this.controls.target.set(0, 0.4, 0)
     this.controls.maxPolarAngle = Math.PI * 0.48
     this.controls.minDistance = 8
@@ -99,6 +107,12 @@ export class WorldScene {
     this.crystals = this.createRidgeCrystals()
     this.scene.add(this.crystals)
 
+    const waterParts = this.createBasinWater()
+    this.water = waterParts.surface
+    this.waterRing = waterParts.ring
+    this.waterMaterial = waterParts.material
+    this.scene.add(this.water, this.waterRing)
+
     this.geometry = new THREE.PlaneGeometry(terrain.worldWidth, terrain.worldWidth, terrain.size - 1, terrain.size - 1)
     this.geometry.rotateX(-Math.PI / 2)
     this.geometry.setAttribute('color', new THREE.Float32BufferAttribute(this.vertexColors(), 3))
@@ -114,6 +128,7 @@ export class WorldScene {
 
   updateAcousticAtmosphere(controls: AtmosphereControls, frontX: number): void {
     const blend = THREE.MathUtils.clamp(controls.spectralBlend, 0, 1)
+    this.targetPaletteBlend = blend
     const energy = THREE.MathUtils.clamp(controls.energy, 0, 1)
     this.targetTeal = 0.18 + (1 - blend) * 1.15 + energy * 0.35
     this.targetViolet = 0.18 + blend * 1.2 + energy * 0.25
@@ -122,6 +137,49 @@ export class WorldScene {
     this.targetAccentZ = Math.sin((this.targetAccentX + this.terrain.worldWidth / 2) * 0.11) * 2.5
     const accentColor = new THREE.Color('#55d6c2').lerp(new THREE.Color('#9b7bff'), blend)
     this.accentLight.color.copy(accentColor)
+  }
+
+  private createBasinWater(): { surface: THREE.Mesh; ring: THREE.Mesh; material: THREE.MeshStandardMaterial } {
+    // The basin is centred near the lowland depression defined by the terrain generator.
+    const centerX = this.terrain.worldWidth * 0.06
+    const centerZ = this.terrain.worldWidth * 0.04
+    const step = this.terrain.worldWidth / (this.terrain.size - 1)
+    const centerCol = Math.round(centerX / step + (this.terrain.size - 1) / 2)
+    const centerRow = Math.round((this.terrain.size - 1) / 2 - centerZ / step)
+    let basinFloor = Infinity
+    for (let row = Math.max(0, centerRow - 7); row <= Math.min(this.terrain.size - 1, centerRow + 7); row++) {
+      for (let col = Math.max(0, centerCol - 7); col <= Math.min(this.terrain.size - 1, centerCol + 7); col++) {
+        basinFloor = Math.min(basinFloor, this.terrain.heights[row * this.terrain.size + col])
+      }
+    }
+    const waterLevel = basinFloor + 0.16
+    const material = new THREE.MeshStandardMaterial({
+      color: '#276b83', emissive: '#103b58', emissiveIntensity: 0.32,
+      metalness: 0.62, roughness: 0.2, transparent: true, opacity: 0.72,
+      depthWrite: false, side: THREE.DoubleSide,
+    })
+    const geometry = new THREE.CircleGeometry(3.15, 64)
+    geometry.rotateX(-Math.PI / 2)
+    const surface = new THREE.Mesh(geometry, material)
+    surface.position.set(centerX, waterLevel, centerZ)
+    surface.renderOrder = 1
+
+    const ringMaterial = new THREE.MeshBasicMaterial({
+      color: '#58cfc6', transparent: true, opacity: 0.38,
+      side: THREE.DoubleSide, depthWrite: false,
+    })
+    const ringGeometry = new THREE.TorusGeometry(3.18, 0.035, 6, 80)
+    ringGeometry.rotateX(Math.PI / 2)
+    const ring = new THREE.Mesh(ringGeometry, ringMaterial)
+    ring.position.set(centerX, waterLevel + 0.025, centerZ)
+    ring.renderOrder = 2
+    return { surface, ring, material }
+  }
+
+  resetCamera(): void {
+    this.camera.position.set(24, 19, 29)
+    this.controls.target.set(0, 0.4, 0)
+    this.controls.update()
   }
 
   private createRidgeCrystals(): THREE.Group {
@@ -173,9 +231,13 @@ export class WorldScene {
     const slope = new THREE.Color('#343a56')
     const high = new THREE.Color('#65708e')
     const crest = new THREE.Color('#a3a9c7')
-    if (height < 0.15) return deep.lerp(slope, THREE.MathUtils.smoothstep(height, -0.8, 0.15))
-    if (height < 1.15) return slope.lerp(high, THREE.MathUtils.smoothstep(height, 0.15, 1.15))
-    return high.lerp(crest, THREE.MathUtils.smoothstep(height, 1.15, 3.2))
+    let base: THREE.Color
+    if (height < 0.15) base = deep.lerp(slope, THREE.MathUtils.smoothstep(height, -0.8, 0.15))
+    else if (height < 1.15) base = slope.lerp(high, THREE.MathUtils.smoothstep(height, 0.15, 1.15))
+    else base = high.lerp(crest, THREE.MathUtils.smoothstep(height, 1.15, 3.2))
+    const tealTint = new THREE.Color('#246f70')
+    const violetTint = new THREE.Color('#704e9e')
+    return base.lerp(tealTint.lerp(violetTint, this.currentPaletteBlend), 0.16)
   }
 
   private vertexColors(): number[] {
@@ -201,6 +263,15 @@ export class WorldScene {
     this.geometry.computeVertexNormals()
   }
 
+  private updateTerrainColors(): void {
+    const colors = this.geometry.attributes.color as THREE.BufferAttribute
+    for (let i = 0; i < this.terrain.heights.length; i++) {
+      const color = this.terrainColor(this.terrain.heights[i])
+      colors.setXYZ(i, color.r, color.g, color.b)
+    }
+    colors.needsUpdate = true
+  }
+
   private resize = (): void => {
     if (this.disposed) return
     const width = Math.max(1, this.host.clientWidth), height = Math.max(1, this.host.clientHeight)
@@ -218,6 +289,12 @@ export class WorldScene {
     this.tealLight.intensity = THREE.MathUtils.lerp(this.tealLight.intensity, this.targetTeal, 0.035)
     this.violetLight.intensity = THREE.MathUtils.lerp(this.violetLight.intensity, this.targetViolet, 0.035)
     this.currentPulse = THREE.MathUtils.lerp(this.currentPulse, this.targetPulse, 0.22)
+    this.currentPaletteBlend = THREE.MathUtils.lerp(this.currentPaletteBlend, this.targetPaletteBlend, 0.025)
+    if (Math.floor(performance.now() / 16) % 8 === 0) this.updateTerrainColors()
+    this.water.rotation.y = Math.sin(time * 1.8) * 0.012
+    this.waterMaterial.emissiveIntensity = 0.24 + Math.sin(time * 2.2) * 0.08
+    this.waterMaterial.opacity = 0.68 + Math.sin(time * 1.3) * 0.035
+    this.waterRing.rotation.z = Math.sin(time * 0.7) * 0.025
     this.targetPulse *= 0.9
     this.accentLight.intensity = this.currentPulse * 5.5
     this.accentLight.position.set(this.targetAccentX, 2.5, this.targetAccentZ)
@@ -242,6 +319,10 @@ export class WorldScene {
     window.removeEventListener('resize', this.resize)
     this.controls.dispose()
     this.geometry.dispose()
+    this.water.geometry.dispose()
+    this.waterMaterial.dispose()
+    this.waterRing.geometry.dispose()
+    ;(this.waterRing.material as THREE.Material).dispose()
     this.mist.geometry.dispose()
     ;(this.mist.material as THREE.Material).dispose()
     this.stars.geometry.dispose()
