@@ -43,6 +43,7 @@ The current branch contains a first end-to-end prototype with M4 environmental c
 - M4.6 renders three expanding spatial wavefronts at the active generation point. Onset strength reveals each ripple, spectral brightness shifts it from teal to violet, signal energy expands its reach, and stable pitch changes propagation speed and spread. The effect is transient and does not modify terrain or saved-world data.
 - M4.7 adds a bounded, fixed-size field of drifting sound motes around the active generation point. Pitch changes their orbital drift, energy and onsets expand and brighten the field, and spectral brightness controls its teal/violet tint.
 - M4.8 classifies recent feature windows into ambient, sustained, accent and rhythmic patterns using only energy and a bounded history of onset timestamps. Sustained tones change cloud drift and mote movement, sharp accents briefly scale floating rocks, and stable rhythmic pulses animate flora, water and rock rotation. No raw audio is stored.
+- M4.9 reconstructs spatial sound landmarks from the already-saved sculpt history: low tones leave teal columns, high tones violet crystals, and sharp accents golden rings. Landmark positions follow the deterministic generation front and sample the final terrain heightfield. Landmarks are regenerated on load/replay, cleared on reset, and capped at 80; the persistence format is unchanged. Browser visual validation is pending.
 
 ## M2 visual and behaviour decisions
 
