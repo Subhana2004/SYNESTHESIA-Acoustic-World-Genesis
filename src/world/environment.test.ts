@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createTerrain } from './terrain'
 import { generateEnvironmentLayout } from './environment'
+import { getBiomeWeights } from './biomes'
 
 describe('procedural environment layout', () => {
   it('is deterministic for a fixed terrain seed', () => {
@@ -25,6 +26,23 @@ describe('procedural environment layout', () => {
     expect(layout.flora.length).toBeGreaterThan(20)
     expect(layout.floatingRocks).toHaveLength(9)
     expect(layout.clouds).toHaveLength(7)
+  })
+
+  it('populates all three biomes with species suited to their elevation', () => {
+    const terrain = createTerrain()
+    const flora = generateEnvironmentLayout(terrain).flora
+    const counts = { mire: 0, forest: 0, highlands: 0 }
+    for (const plant of flora) {
+      counts[plant.biome] += 1
+      const weights = getBiomeWeights(plant.y)
+      const expected = weights.mire >= weights.forest && weights.mire >= weights.highlands
+        ? 'mire'
+        : weights.forest >= weights.highlands ? 'forest' : 'highlands'
+      expect(plant.biome).toBe(expected)
+    }
+    expect(counts.mire).toBeGreaterThan(0)
+    expect(counts.forest).toBeGreaterThan(0)
+    expect(counts.highlands).toBeGreaterThan(0)
   })
 
   it('places vegetation on suitable ground and above the basin', () => {
