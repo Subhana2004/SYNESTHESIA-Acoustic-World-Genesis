@@ -7,7 +7,7 @@ Instead of transcribing speech or interpreting words, it treats sound as a creat
 **Live demo:** https://synesthesia-acoustic-world-genesis.vercel.app  
 **Repository:** https://github.com/Subhana2004/SYNESTHESIA-Acoustic-World-Genesis
 
-> **Project status:** Ongoing experimental project. The browser MVP and milestones M0–M6 are implemented; automated validation is passing. Physical-device microphone and GPU-performance checks remain outstanding.
+> **Project status: Ongoing — still under active development.** The browser MVP and milestones M0–M6 have been implemented, and automated validation is passing. The project is not considered complete: physical-device microphone and GPU-performance checks remain outstanding, and improvements to audio interpretation, terrain generation and rendering are ongoing.
 
 ## What it does
 
