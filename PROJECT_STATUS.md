@@ -1,0 +1,73 @@
+# SYNESTHESIA — Project Status
+
+Last updated: 2026-11-10
+
+## Milestone status
+
+| Milestone | Status | Delivered |
+|---|---|---|
+| M0 — Architecture and feasibility | Complete | Browser-first architecture, privacy boundary, deterministic terrain and risk decisions |
+| M1 — Audio foundation | Complete | Opt-in Web Audio capture, RMS, confidence-gated pitch, spectral centroid and onset features |
+| M2 — Acoustic terrain genesis | Complete | Seeded hybrid terrain, bounded sound-driven sculpting, dark 3D renderer and camera exploration |
+| M3 — Persistence and replay | Complete | IndexedDB gallery, save/load, rename/delete, deterministic feature replay, validated JSON import/export and per-world discovery/event state |
+| M4 — Environment construction | Complete | Three elevation biomes, biome-specific flora, floating rocks, clouds, mist, water, sound waves, motes, sound traces and procedural phenomena |
+| M5 — Visual and interaction refinement | Complete | Responsive controls, camera tools, minimap, field notes, landmark discovery, event journal, keyboard exploration, per-world statistics and resource lifecycle fixes |
+| M6 — Integration and validation | Automated checks complete; device QA outstanding | 57 unit tests, production build, production dependency audit and 16 Playwright desktop/mobile checks pass in GitHub Actions; physical-device checks remain |
+
+## Current feature set
+
+### Audio and terrain
+- Microphone permission is requested only after the user selects **Begin listening**.
+- Audio is analysed locally into RMS energy, confidence-gated autocorrelation pitch, spectral centroid and onset strength.
+- Pitch estimation uses 2x decimation to reduce autocorrelation work while retaining the supported 65–1000 Hz band.
+- Acoustic features sculpt a deterministic seeded heightfield at a bounded generation front.
+- Silence and paused input preserve the existing terrain.
+- The feature stream is bounded to 20,000 sculpt samples; no raw audio is persisted.
+
+### Environments and sound response
+- Three continuous elevation biomes: mire, echo forest and crystal highlands.
+- Each biome has distinct procedural flora and emissive behaviour.
+- Floating rocks, clouds, mist, stars, ridge crystals and basin water are seeded from world identity.
+- Spectral brightness, energy, pitch, accents and rhythmic patterns influence lighting, colour, wavefronts, motes and ambient motion.
+- Sound traces are reconstructed from feature history and capped at 80.
+- World phenomena include meteor showers, highland auroras, echo blooms and mire lights. Up to 100 events are stored per world.
+
+### Exploration and world memory
+- A clickable and keyboard-operable 25×25 biome minimap supports region inspection.
+- Terrain inspection reports biome, elevation, coordinates and nearby sound traces.
+- Named landmarks can be discovered in the 3D scene or minimap and tracked in a field journal.
+- Saved worlds retain discovered landmark IDs and world-event history.
+- The gallery displays terrain previews, seed, sculpt sample count, exploration completion, phenomena count and discovered biome count.
+- Save, load, rename, delete, replay, export and import are implemented.
+- Import and local-load validation bounds dimensions, heightfield values, acoustic history, discovery IDs and event metadata. Older saved worlds without optional discovery/event fields remain compatible.
+- Persistence is local to the current browser profile/device. Export is the portable transfer mechanism; cloud sync is not implemented.
+
+## Recent stabilization work
+
+- Fixed terrain-space Z orientation for flora placement, ridge crystals and basin water so generated environment objects align with the rendered heightfield.
+- Rebuilds seed-dependent environment objects, water, mist and stars when a different saved world is loaded.
+- Keeps event markers anchored to the evolving terrain surface and allows event selection in the 3D scene and event journal.
+- Fixed event-marker disposal so refreshing landmark markers no longer disposes the event journal's geometry.
+- Added complete cleanup for Three.js geometry/material resources and a ResizeObserver for responsive viewport sizing.
+- Reset acoustic-pattern state between worlds.
+- Hardened microphone startup cancellation, including permission prompts that resolve after a reset or component unmount.
+- Added keyboard arrow navigation to the minimap and visible keyboard focus styles.
+- Added Playwright checks for rendering, WebGL fallback, camera controls, keyboard minimap navigation, microphone permission failure/success, mobile overflow, and world save/export/import/load/rename/delete—including a different-seed import with a saved phenomenon.
+- Lazy-loaded the Three.js world renderer and split React, Three.js core and Three.js controls into separate bundles; the initial interface bundle is substantially smaller.
+- Capped visible 3D phenomena markers at 32 while retaining up to 100 events in the saved journal.
+
+## Verification
+
+- Full GitHub Actions validation passed at commit 7843c1d: 57 unit tests across 9 files, TypeScript checks, production Vite build, production dependency audit and 16 Playwright browser checks.
+- The 16 browser checks passed on both desktop Chromium and mobile Chromium using software WebGL and a fake microphone. They cover 3D rendering, WebGL fallback, camera controls, keyboard minimap navigation, microphone permission failure/success, mobile overflow, world save/export/import/load/rename/delete, alternate-seed restoration and saved-event navigation.
+- The build separates the initial interface bundle (about 176 KB / 58 KB gzip) from the lazy-loaded Three.js core (about 486 KB / 123 KB gzip) and controls bundle (about 19 KB / 4 KB gzip).
+- Production dependency audit passes at high severity threshold. Browser test screenshots and logs are retained as a GitHub Actions artifact.
+- Transient sound-pattern state resets when microphone input is paused, preventing stale rhythm or sustained-tone classification when listening resumes.
+- Physical-device microphone quality, real GPU profiling and browser-specific WebGL behaviour remain outside automated CI.
+## Known limitations and next validation targets
+
+- Pitch estimation is a lightweight autocorrelation starter, not a validated production pitch tracker.
+- Rhythm detection is heuristic onset-interval classification, not a dedicated beat tracker.
+- The world uses a single heightfield mesh; larger worlds need chunking or a clipmap.
+- Undo/redo, cloud sync, collaborative worlds and WebGL context-loss recovery are not implemented.
+- Test on at least one physical iOS device and one lower-powered Android device before a public release.

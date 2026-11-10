@@ -1,0 +1,38 @@
+name: SYNESTHESIA CI
+
+on:
+  push:
+    branches: [main, m0-vertical-slice]
+  pull_request:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install dependencies
+        run: npm install
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+      - name: Run unit tests
+        run: npm test
+      - name: Build production app
+        run: npm run build
+      - name: Install Chromium for browser tests
+        run: npx playwright install --with-deps chromium
+      - name: Run browser smoke tests
+        run: npm run test:e2e
+      - name: Upload browser test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: synesthesia-browser-test-results
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 7

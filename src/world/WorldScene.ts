@@ -1,0 +1,907 @@
+import * as THREE from 'three'
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
+import type { AtmosphereControls } from '../audio/features'
+import type { TerrainState } from './terrain'
+import { generateEnvironmentLayout } from './environment'
+import { getBiomeWeights } from './biomes'
+import { updateSoundPattern, type SoundPattern, type SoundPatternState } from './soundPatterns'
+import { deriveSoundTraces, type TraceEvent } from './soundTraces'
+import type { WorldLandmark } from './discovery'
+import type { WorldEvent } from './worldEvents'
+
+function disposeObjectResources(root: THREE.Object3D): void {
+  const geometries = new Set<THREE.BufferGeometry>()
+  const materials = new Set<THREE.Material>()
+  root.traverse(object => {
+    if (object instanceof THREE.Mesh || object instanceof THREE.Points) {
+      geometries.add(object.geometry)
+      const assigned = Array.isArray(object.material) ? object.material : [object.material]
+      assigned.forEach(material => materials.add(material))
+    }
+  })
+  geometries.forEach(geometry => geometry.dispose())
+  materials.forEach(material => material.dispose())
+}
+
+export interface TerrainInspection { x: number; z: number; elevation: number; biome: 'mire' | 'forest' | 'highlands' }
+
+export class WorldScene {
+  private renderer: THREE.WebGLRenderer
+  private scene = new THREE.Scene()
+  private camera = new THREE.PerspectiveCamera(48, 1, 0.1, 180)
+  private controls: OrbitControls
+  private geometry: THREE.PlaneGeometry
+  private mesh: THREE.Mesh
+  private inspectionMarker: THREE.Mesh
+  private frame = 0
+  private disposed = false
+  private resizeObserver: ResizeObserver | null = null
+  private reducedMotion = false
+  private lastReducedMotionRender = 0
+  private tealLight: THREE.PointLight
+  private violetLight: THREE.PointLight
+  private accentLight: THREE.PointLight
+  private targetTeal = 0.55
+  private targetViolet = 0.35
+  private targetPulse = 0
+  private currentPulse = 0
+  private targetAccentX = 0
+  private targetAccentZ = 0
+  private mist: THREE.Points
+  private mistPositions: Float32Array
+  private mistPhases: Float32Array
+  private stars: THREE.Points
+  private crystals: THREE.Group
+  private water: THREE.Mesh
+  private waterRing: THREE.Mesh
+  private waterMaterial: THREE.MeshStandardMaterial
+  private targetPaletteBlend = 0.35
+  private currentPaletteBlend = 0.35
+  private targetBiomeEnergy = 0
+  private currentBiomeEnergy = 0
+  private flora: THREE.Group
+  private floatingRocks: THREE.InstancedMesh
+  private clouds: THREE.Group
+  private soundRipples: THREE.Mesh[] = []
+  private targetPitchTone = 0.35
+  private soundMotes: THREE.Points
+  private motePositions: Float32Array
+  private motePhases: Float32Array
+  private moteAngles: Float32Array
+  private moteRadii: Float32Array
+  private moteMaterial: THREE.PointsMaterial
+  private soundPatternState: SoundPatternState = { sustainedSince: null, onsetTimes: [], lastOnset: -Infinity }
+  private soundPattern: SoundPattern = 'ambient'
+  private rhythmStrength = 0
+  private traceGroup = new THREE.Group()
+  private discoveryGroup = new THREE.Group()
+  private eventGroup = new THREE.Group()
+  private readonly tealColor = new THREE.Color('#55d6c2')
+  private readonly violetColor = new THREE.Color('#a58cff')
+  private readonly rockBaseColor = new THREE.Color('#17152b')
+  private readonly rockAccentColor = new THREE.Color('#4c3e83')
+  private readonly cloudBaseColor = new THREE.Color('#8585ad')
+  private readonly cloudAccentColor = new THREE.Color('#8b72c8')
+  private readonly terrainPalettes = [new THREE.Color('#174b55'), new THREE.Color('#285b50'), new THREE.Color('#51446f')]
+  private readonly terrainAccentLow = new THREE.Color('#287e83')
+  private readonly terrainAccentHigh = new THREE.Color('#9870c7')
+  private readonly terrainDark = new THREE.Color('#172536')
+  private readonly terrainColorResult = new THREE.Color()
+  private readonly terrainColorScratch = new THREE.Color()
+  private readonly terrainSpectralScratch = new THREE.Color()
+  private readonly terrainEnergyScratch = new THREE.Color()
+  private lastTerrainColorUpdate = 0
+
+  constructor(private host: HTMLDivElement, private terrain: TerrainState) {
+    this.reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
+    this.scene.background = new THREE.Color('#080a12')
+    this.scene.fog = new THREE.FogExp2('#111827', 0.022)
+    this.camera.position.set(24, 19, 29)
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'low-power' })
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25))
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping
+    this.renderer.toneMappingExposure = 1.05
+    host.appendChild(this.renderer.domElement)
+    this.controls = new OrbitControls(this.camera, this.renderer.domElement)
+    this.controls.enableDamping = true
+    this.controls.enablePan = true
+    this.controls.enableZoom = true
+    this.controls.screenSpacePanning = false
+    this.controls.target.set(0, 0.4, 0)
+    this.controls.maxPolarAngle = Math.PI * 0.48
+    this.controls.minDistance = 8
+    this.controls.maxDistance = 70
+
+    this.scene.add(new THREE.HemisphereLight('#a9b4d8', '#111322', 0.9))
+    const moon = new THREE.DirectionalLight('#c4c9e8', 1.55)
+    moon.position.set(-18, 30, 12)
+    this.scene.add(moon)
+    this.tealLight = new THREE.PointLight('#55d6c2', 0, 38, 2)
+    this.tealLight.position.set(-10, 5, 2)
+    this.scene.add(this.tealLight)
+    this.violetLight = new THREE.PointLight('#9b7bff', 0, 34, 2)
+    this.violetLight.position.set(12, 4, -12)
+    this.scene.add(this.violetLight)
+    this.accentLight = new THREE.PointLight('#55d6c2', 0, 18, 2)
+    this.accentLight.position.set(0, 2.5, 0)
+    this.scene.add(this.accentLight)
+
+    // A fixed-size mote field creates a soft burst around each incoming sound accent.
+    const moteCount = 112
+    this.motePositions = new Float32Array(moteCount * 3)
+    this.motePhases = new Float32Array(moteCount)
+    this.moteAngles = new Float32Array(moteCount)
+    this.moteRadii = new Float32Array(moteCount)
+    for (let i = 0; i < moteCount; i++) {
+      this.motePhases[i] = ((i * 2.399963) % (Math.PI * 2))
+      this.moteAngles[i] = ((i * 1.618034) % (Math.PI * 2))
+      this.moteRadii[i] = 0.7 + ((i * 37) % 101) / 101 * 3.8
+    }
+    const moteGeometry = new THREE.BufferGeometry()
+    moteGeometry.setAttribute('position', new THREE.BufferAttribute(this.motePositions, 3))
+    this.moteMaterial = new THREE.PointsMaterial({
+      color: '#69d8cb', size: 0.09, transparent: true, opacity: 0.12,
+      depthWrite: false, sizeAttenuation: true,
+    })
+    this.soundMotes = new THREE.Points(moteGeometry, this.moteMaterial)
+    this.scene.add(this.soundMotes)
+    this.scene.add(this.traceGroup)
+    this.scene.add(this.discoveryGroup)
+    this.scene.add(this.eventGroup)
+
+    // Expanding wavefronts visualise accents at the active generation point.
+    for (let i = 0; i < 3; i++) {
+      const material = new THREE.MeshBasicMaterial({
+        color: '#55d6c2', transparent: true, opacity: 0,
+        side: THREE.DoubleSide, depthWrite: false,
+      })
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(1, 0.025, 6, 72), material)
+      ring.rotation.x = Math.PI / 2
+      ring.userData.phase = i / 3
+      this.soundRipples.push(ring)
+      this.scene.add(ring)
+    }
+
+    // Lightweight point sprites provide drifting valley mist without a particle-system dependency.
+    const mistCount = 260
+    this.mistPositions = new Float32Array(mistCount * 3)
+    this.mistPhases = new Float32Array(mistCount)
+    let randomState = terrain.seed >>> 0
+    const random = () => {
+      randomState = (1664525 * randomState + 1013904223) >>> 0
+      return randomState / 4294967296
+    }
+    for (let i = 0; i < mistCount; i++) {
+      this.mistPositions[i * 3] = (random() - 0.5) * terrain.worldWidth
+      this.mistPositions[i * 3 + 1] = 0.45 + random() * 2.4
+      this.mistPositions[i * 3 + 2] = (random() - 0.5) * terrain.worldWidth
+      this.mistPhases[i] = random() * Math.PI * 2
+    }
+    const mistGeometry = new THREE.BufferGeometry()
+    mistGeometry.setAttribute('position', new THREE.BufferAttribute(this.mistPositions, 3))
+    const mistMaterial = new THREE.PointsMaterial({
+      color: '#8b9dc7', size: 0.22, transparent: true, opacity: 0.2,
+      depthWrite: false, sizeAttenuation: true,
+    })
+    this.mist = new THREE.Points(mistGeometry, mistMaterial)
+    this.scene.add(this.mist)
+
+    const starPositions: number[] = []
+    for (let i = 0; i < 420; i++) {
+      const angle = random() * Math.PI * 2
+      const radius = 48 + random() * 38
+      starPositions.push(Math.cos(angle) * radius, 13 + random() * 28, Math.sin(angle) * radius)
+    }
+    const starGeometry = new THREE.BufferGeometry()
+    starGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starPositions, 3))
+    this.stars = new THREE.Points(starGeometry, new THREE.PointsMaterial({
+      color: '#c4c9e8', size: 0.16, transparent: true, opacity: 0.72,
+      depthWrite: false, sizeAttenuation: true,
+    }))
+    this.scene.add(this.stars)
+
+    this.crystals = this.createRidgeCrystals()
+    this.scene.add(this.crystals)
+
+    const environment = this.createEnvironment()
+    this.flora = environment.flora
+    this.floatingRocks = environment.floatingRocks
+    this.clouds = environment.clouds
+    this.scene.add(this.flora, this.floatingRocks, this.clouds)
+
+    const waterParts = this.createBasinWater()
+    this.water = waterParts.surface
+    this.waterRing = waterParts.ring
+    this.waterMaterial = waterParts.material
+    this.scene.add(this.water, this.waterRing)
+
+    this.geometry = new THREE.PlaneGeometry(terrain.worldWidth, terrain.worldWidth, terrain.size - 1, terrain.size - 1)
+    this.geometry.rotateX(-Math.PI / 2)
+    this.geometry.setAttribute('color', new THREE.Float32BufferAttribute(this.vertexColors(), 3))
+    this.mesh = new THREE.Mesh(this.geometry, new THREE.MeshStandardMaterial({
+      vertexColors: true, roughness: 0.88, metalness: 0.08,
+    }))
+    this.scene.add(this.mesh)
+    this.inspectionMarker = new THREE.Mesh(
+      new THREE.TorusGeometry(0.62, 0.035, 6, 36),
+      new THREE.MeshBasicMaterial({ color: '#f2d69a', transparent: true, opacity: 0.95 }),
+    )
+    this.inspectionMarker.rotation.x = Math.PI / 2
+    this.inspectionMarker.visible = false
+    this.scene.add(this.inspectionMarker)
+    this.updateTerrain()
+    this.resize()
+    window.addEventListener('resize', this.resize)
+    if ('ResizeObserver' in window) {
+      this.resizeObserver = new ResizeObserver(this.resize)
+      this.resizeObserver.observe(host)
+    }
+    document.addEventListener('visibilitychange', this.handleVisibilityChange)
+    this.animate()
+  }
+
+  updateAcousticAtmosphere(controls: AtmosphereControls, frontX: number): SoundPattern {
+    const blend = THREE.MathUtils.clamp(controls.spectralBlend, 0, 1)
+    this.targetPaletteBlend = blend
+    this.targetPitchTone = THREE.MathUtils.clamp(controls.pitchTone, 0, 1)
+    const energy = THREE.MathUtils.clamp(controls.energy, 0, 1)
+    this.targetBiomeEnergy = energy
+    const pattern = updateSoundPattern(
+      this.soundPatternState, energy, controls.onsetPulse, performance.now(),
+    )
+    this.soundPatternState = pattern.state
+    this.soundPattern = pattern.pattern
+    this.rhythmStrength = pattern.rhythmStrength
+    this.targetTeal = 0.18 + (1 - blend) * 1.15 + energy * 0.35
+    this.targetViolet = 0.18 + blend * 1.2 + energy * 0.25
+    this.targetPulse = Math.max(this.targetPulse, THREE.MathUtils.clamp(controls.onsetPulse, 0, 1))
+    this.targetAccentX = THREE.MathUtils.clamp(frontX, -this.terrain.worldWidth / 2, this.terrain.worldWidth / 2)
+    this.targetAccentZ = Math.sin((this.targetAccentX + this.terrain.worldWidth / 2) * 0.11) * 2.5
+    this.accentLight.color.copy(this.tealColor).lerp(this.violetColor, blend)
+    return this.soundPattern
+  }
+
+  zoomBy(factor: number): void {
+    const offset = this.camera.position.clone().sub(this.controls.target)
+    const distance = THREE.MathUtils.clamp(offset.length() * factor, this.controls.minDistance, this.controls.maxDistance)
+    this.camera.position.copy(this.controls.target).add(offset.normalize().multiplyScalar(distance))
+    this.controls.update()
+  }
+
+  updateSoundTraces(history: readonly TraceEvent[]): void {
+    for (const object of this.traceGroup.children) {
+      if (object instanceof THREE.Mesh) {
+        object.geometry.dispose()
+        ;(object.material as THREE.Material).dispose()
+      }
+    }
+    this.traceGroup.clear()
+    const traces = deriveSoundTraces(this.terrain, history)
+    const transform = new THREE.Object3D()
+    const kinds = ['low', 'high', 'accent'] as const
+    for (const kind of kinds) {
+      const group = traces.filter(trace => trace.kind === kind)
+      if (group.length === 0) continue
+      const geometry = kind === 'accent'
+        ? new THREE.TorusGeometry(0.34, 0.028, 5, 24)
+        : kind === 'high'
+          ? new THREE.OctahedronGeometry(0.34)
+          : new THREE.CylinderGeometry(0.11, 0.16, 0.72, 6)
+      const color = kind === 'accent' ? '#f2c879' : kind === 'high' ? '#a58cff' : '#55d6c2'
+      const material = new THREE.MeshStandardMaterial({
+        color, emissive: color, emissiveIntensity: 0.65,
+        transparent: true, opacity: 0.82, roughness: 0.42,
+      })
+      const instances = new THREE.InstancedMesh(geometry, material, group.length)
+      group.forEach((trace, index) => {
+        transform.position.set(trace.x, trace.y + (kind === 'accent' ? 0.28 : 0.35), trace.z)
+        transform.rotation.set(kind === 'accent' ? Math.PI / 2 : 0, 0, 0)
+        transform.scale.setScalar(0.72 + trace.strength * 0.5)
+        transform.updateMatrix()
+        instances.setMatrixAt(index, transform.matrix)
+      })
+      instances.instanceMatrix.needsUpdate = true
+      this.traceGroup.add(instances)
+    }
+  }
+
+  private createEnvironment(): { flora: THREE.Group; floatingRocks: THREE.InstancedMesh; clouds: THREE.Group } {
+    const layout = generateEnvironmentLayout(this.terrain)
+    const flora = new THREE.Group()
+    const transform = new THREE.Object3D()
+    const species = [
+      {
+        biome: 'mire',
+        stemGeometry: new THREE.CylinderGeometry(0.035, 0.075, 0.7, 5),
+        crownGeometry: new THREE.IcosahedronGeometry(0.15, 1),
+        stemColor: '#254c4c', crownColor: '#9ee9dc', emissive: '#2cbaaa',
+        hueStart: 0.46, hueRange: 0.17,
+      },
+      {
+        biome: 'forest',
+        stemGeometry: new THREE.CylinderGeometry(0.055, 0.09, 0.48, 7),
+        crownGeometry: new THREE.SphereGeometry(0.22, 9, 7),
+        stemColor: '#493d50', crownColor: '#b4a0cf', emissive: '#7554a0',
+        hueStart: 0.72, hueRange: 0.12,
+      },
+      {
+        biome: 'highlands',
+        stemGeometry: new THREE.ConeGeometry(0.12, 0.72, 5),
+        crownGeometry: new THREE.OctahedronGeometry(0.17, 0),
+        stemColor: '#41445f', crownColor: '#d2c6ff', emissive: '#8972db',
+        hueStart: 0.65, hueRange: 0.12,
+      },
+    ] as const
+
+    for (const speciesType of species) {
+      const plants = layout.flora.filter(plant => plant.biome === speciesType.biome)
+      if (plants.length === 0) continue
+      const stemMaterial = new THREE.MeshStandardMaterial({
+        color: speciesType.stemColor, roughness: 0.72, metalness: 0.12,
+      })
+      const crownMaterial = new THREE.MeshStandardMaterial({
+        color: speciesType.crownColor, emissive: speciesType.emissive,
+        emissiveIntensity: 1.45, roughness: 0.3, metalness: 0.08,
+      })
+      const stems = new THREE.InstancedMesh(speciesType.stemGeometry, stemMaterial, plants.length)
+      const crowns = new THREE.InstancedMesh(speciesType.crownGeometry, crownMaterial, plants.length)
+      crowns.userData.biome = speciesType.biome
+      crowns.userData.pulseOffset = speciesType.biome === 'mire' ? 0 : speciesType.biome === 'forest' ? 1.7 : 3.2
+      crowns.userData.baseEmissive = 1.45
+      plants.forEach((plant, index) => {
+        const height = (speciesType.biome === 'forest' ? 0.48 : 0.72) * plant.scale
+        transform.position.set(plant.x, plant.y + height * 0.5, plant.z)
+        transform.rotation.set(0, plant.hue * Math.PI * 2, (plant.hue - 0.5) * 0.16)
+        transform.scale.set(plant.scale, plant.scale, plant.scale)
+        transform.updateMatrix()
+        stems.setMatrixAt(index, transform.matrix)
+
+        transform.position.set(plant.x, plant.y + height * 0.92, plant.z)
+        transform.scale.setScalar(plant.scale * (0.72 + plant.hue * 0.28))
+        transform.updateMatrix()
+        crowns.setMatrixAt(index, transform.matrix)
+        crowns.setColorAt(index, new THREE.Color().setHSL(
+          speciesType.hueStart + plant.hue * speciesType.hueRange, 0.62, 0.66,
+        ))
+      })
+      stems.instanceMatrix.needsUpdate = true
+      crowns.instanceMatrix.needsUpdate = true
+      flora.add(stems, crowns)
+    }
+
+    const rockGeometry = new THREE.DodecahedronGeometry(1, 0)
+    const rockMaterial = new THREE.MeshStandardMaterial({
+      color: '#45465f', emissive: '#17152b', emissiveIntensity: 0.28,
+      roughness: 0.92, metalness: 0.12, flatShading: true,
+    })
+    const floatingRocks = new THREE.InstancedMesh(rockGeometry, rockMaterial, layout.floatingRocks.length)
+    layout.floatingRocks.forEach((rock, index) => {
+      transform.position.set(rock.x, rock.y, rock.z)
+      transform.rotation.set(rock.rotation * 0.35, rock.rotation, rock.rotation * 0.2)
+      transform.scale.set(rock.scale * 1.25, rock.scale * 0.72, rock.scale)
+      transform.updateMatrix()
+      floatingRocks.setMatrixAt(index, transform.matrix)
+    })
+    floatingRocks.instanceMatrix.needsUpdate = true
+
+    const clouds = new THREE.Group()
+    const cloudGeometry = new THREE.SphereGeometry(1, 12, 8)
+    const cloudMaterial = new THREE.MeshStandardMaterial({
+      color: '#8585ad', transparent: true, opacity: 0.13,
+      roughness: 1, depthWrite: false,
+    })
+    layout.clouds.forEach(cloud => {
+      const cluster = new THREE.Group()
+      const lobes = [
+        { x: 0, y: 0, z: 0, scale: 1.0 },
+        { x: 0.72, y: 0.12, z: 0.18, scale: 0.72 },
+        { x: -0.68, y: -0.08, z: -0.12, scale: 0.82 },
+      ]
+      lobes.forEach(lobe => {
+        const puff = new THREE.Mesh(cloudGeometry, cloudMaterial)
+        puff.position.set(lobe.x * cloud.scale, lobe.y * cloud.scale, lobe.z * cloud.scale)
+        puff.scale.set(cloud.scale * lobe.scale, cloud.scale * 0.34 * lobe.scale, cloud.scale * 0.62 * lobe.scale)
+        cluster.add(puff)
+      })
+      cluster.position.set(cloud.x, cloud.y, cloud.z)
+      cluster.userData.phase = cloud.phase
+      cluster.userData.baseX = cloud.x
+      cluster.userData.baseY = cloud.y
+      clouds.add(cluster)
+    })
+    return { flora, floatingRocks, clouds }
+  }
+
+  private createBasinWater(): { surface: THREE.Mesh; ring: THREE.Mesh; material: THREE.MeshStandardMaterial } {
+    // The basin is centred near the lowland depression defined by the terrain generator.
+    const centerX = this.terrain.worldWidth * 0.06
+    const centerZ = -this.terrain.worldWidth * 0.04
+    const step = this.terrain.worldWidth / (this.terrain.size - 1)
+    const centerCol = Math.round(centerX / step + (this.terrain.size - 1) / 2)
+    const centerRow = Math.round((this.terrain.size - 1) / 2 + centerZ / step)
+    let basinFloor = Infinity
+    for (let row = Math.max(0, centerRow - 7); row <= Math.min(this.terrain.size - 1, centerRow + 7); row++) {
+      for (let col = Math.max(0, centerCol - 7); col <= Math.min(this.terrain.size - 1, centerCol + 7); col++) {
+        basinFloor = Math.min(basinFloor, this.terrain.heights[row * this.terrain.size + col])
+      }
+    }
+    const waterLevel = basinFloor + 0.16
+    const material = new THREE.MeshStandardMaterial({
+      color: '#276b83', emissive: '#103b58', emissiveIntensity: 0.32,
+      metalness: 0.62, roughness: 0.2, transparent: true, opacity: 0.72,
+      depthWrite: false, side: THREE.DoubleSide,
+    })
+    const geometry = new THREE.CircleGeometry(3.15, 64)
+    geometry.rotateX(-Math.PI / 2)
+    const surface = new THREE.Mesh(geometry, material)
+    surface.position.set(centerX, waterLevel, centerZ)
+    surface.renderOrder = 1
+
+    const ringMaterial = new THREE.MeshBasicMaterial({
+      color: '#58cfc6', transparent: true, opacity: 0.38,
+      side: THREE.DoubleSide, depthWrite: false,
+    })
+    const ringGeometry = new THREE.TorusGeometry(3.18, 0.035, 6, 80)
+    ringGeometry.rotateX(Math.PI / 2)
+    const ring = new THREE.Mesh(ringGeometry, ringMaterial)
+    ring.position.set(centerX, waterLevel + 0.025, centerZ)
+    ring.renderOrder = 2
+    return { surface, ring, material }
+  }
+
+  private refreshSeededAtmosphere(): void {
+    let state = this.terrain.seed >>> 0
+    const random = () => {
+      state = (1664525 * state + 1013904223) >>> 0
+      return state / 4294967296
+    }
+    for (let index = 0; index < this.mistPhases.length; index++) {
+      this.mistPositions[index * 3] = (random() - 0.5) * this.terrain.worldWidth
+      this.mistPositions[index * 3 + 1] = 0.45 + random() * 2.4
+      this.mistPositions[index * 3 + 2] = (random() - 0.5) * this.terrain.worldWidth
+      this.mistPhases[index] = random() * Math.PI * 2
+    }
+    ;(this.mist.geometry.attributes.position as THREE.BufferAttribute).needsUpdate = true
+    const stars = this.stars.geometry.attributes.position as THREE.BufferAttribute
+    for (let index = 0; index < stars.count; index++) {
+      const angle = random() * Math.PI * 2
+      const radius = 48 + random() * 38
+      stars.setXYZ(index, Math.cos(angle) * radius, 13 + random() * 28, Math.sin(angle) * radius)
+    }
+    stars.needsUpdate = true
+  }
+
+  rebuildWorldEnvironment(): void {
+    this.scene.remove(this.crystals, this.flora, this.floatingRocks, this.clouds, this.water, this.waterRing)
+    for (const object of [this.crystals, this.flora, this.floatingRocks, this.clouds, this.water, this.waterRing]) {
+      disposeObjectResources(object)
+    }
+    this.crystals = this.createRidgeCrystals()
+    const environment = this.createEnvironment()
+    this.flora = environment.flora
+    this.floatingRocks = environment.floatingRocks
+    this.clouds = environment.clouds
+    const waterParts = this.createBasinWater()
+    this.water = waterParts.surface
+    this.waterRing = waterParts.ring
+    this.waterMaterial = waterParts.material
+    this.scene.add(this.crystals, this.flora, this.floatingRocks, this.clouds, this.water, this.waterRing)
+    this.refreshSeededAtmosphere()
+    this.updateTerrain()
+  }
+
+  resetAcousticState(): void {
+    this.soundPatternState = { sustainedSince: null, onsetTimes: [], lastOnset: -Infinity }
+    this.soundPattern = 'ambient'
+    this.rhythmStrength = 0
+    this.targetPulse = 0
+    this.currentPulse = 0
+    this.targetBiomeEnergy = 0
+    this.currentBiomeEnergy = 0
+    this.targetPaletteBlend = 0.35
+    this.currentPaletteBlend = 0.35
+    this.targetPitchTone = 0.35
+    this.targetTeal = 0.55
+    this.targetViolet = 0.35
+    this.targetAccentX = this.terrain.frontX
+    this.targetAccentZ = Math.sin((this.targetAccentX + this.terrain.worldWidth / 2) * 0.11) * 2.5
+    this.accentLight.intensity = 0
+  }
+
+  resetCamera(): void {
+    this.camera.position.set(24, 19, 29)
+    this.controls.target.set(0, 0.4, 0)
+    this.controls.update()
+  }
+
+  private createRidgeCrystals(): THREE.Group {
+    const group = new THREE.Group()
+    const candidates: Array<{ x: number; z: number; y: number }> = []
+    const stride = 3
+    for (let row = 1; row < this.terrain.size - 1; row += stride) {
+      for (let col = 1; col < this.terrain.size - 1; col += stride) {
+        const index = row * this.terrain.size + col
+        const height = this.terrain.heights[index]
+        if (height < 1.05) continue
+        const x = (col / (this.terrain.size - 1) - 0.5) * this.terrain.worldWidth
+        const z = (row / (this.terrain.size - 1) - 0.5) * this.terrain.worldWidth
+        candidates.push({ x, z, y: height })
+      }
+    }
+    candidates.sort((a, b) => b.y - a.y)
+    const chosen: typeof candidates = []
+    for (const candidate of candidates) {
+      if (chosen.every(other => Math.hypot(other.x - candidate.x, other.z - candidate.z) > 4.2)) {
+        chosen.push(candidate)
+      }
+      if (chosen.length >= 18) break
+    }
+
+    const teal = new THREE.MeshStandardMaterial({
+      color: '#55d6c2', emissive: '#168d82', emissiveIntensity: 1.25,
+      roughness: 0.34, metalness: 0.18,
+    })
+    const violet = new THREE.MeshStandardMaterial({
+      color: '#a58cff', emissive: '#5638a8', emissiveIntensity: 1.35,
+      roughness: 0.3, metalness: 0.2,
+    })
+    chosen.forEach((point, index) => {
+      const height = 0.55 + (index % 4) * 0.22
+      const crystal = new THREE.Mesh(
+        new THREE.ConeGeometry(0.16 + (index % 3) * 0.045, height, 5),
+        index % 3 === 0 ? violet : teal,
+      )
+      crystal.position.set(point.x, point.y + height * 0.42, point.z)
+      crystal.rotation.z = (index % 2 ? 1 : -1) * 0.12
+      group.add(crystal)
+    })
+    return group
+  }
+
+  private terrainColor(height: number): THREE.Color {
+    const biomes = getBiomeWeights(height)
+    const base = this.terrainColorResult
+      .copy(this.terrainPalettes[0]).multiplyScalar(biomes.mire)
+      .add(this.terrainColorScratch.copy(this.terrainPalettes[1]).multiplyScalar(biomes.forest))
+      .add(this.terrainColorScratch.copy(this.terrainPalettes[2]).multiplyScalar(biomes.highlands))
+    this.terrainSpectralScratch.copy(this.terrainAccentLow).lerp(this.terrainAccentHigh, this.currentPaletteBlend)
+    this.terrainEnergyScratch.copy(this.terrainDark).lerp(
+      this.terrainSpectralScratch, 0.12 + this.currentBiomeEnergy * 0.3,
+    )
+    return base.lerp(this.terrainEnergyScratch, 0.22 + this.currentBiomeEnergy * 0.12)
+  }
+
+  private vertexColors(): number[] {
+    const colors: number[] = []
+    for (const height of this.terrain.heights) {
+      const color = this.terrainColor(height)
+      colors.push(color.r, color.g, color.b)
+    }
+    return colors
+  }
+
+  updateDiscoveries(landmarks: readonly WorldLandmark[]): void {
+    this.discoveryGroup.traverse(object => {
+      if (object instanceof THREE.Mesh) {
+        object.geometry.dispose()
+        const materials = Array.isArray(object.material) ? object.material : [object.material]
+        materials.forEach(material => material.dispose())
+      }
+    })
+    this.discoveryGroup.clear()
+    landmarks.forEach(landmark => {
+      const color = landmark.kind === 'basin' ? '#55d6c2'
+        : landmark.kind === 'summit' ? '#b18be5'
+          : landmark.kind === 'grove' ? '#7ed5a8' : '#f2c879'
+      const geometry = landmark.kind === 'basin'
+        ? new THREE.TorusGeometry(0.52, 0.075, 7, 28)
+        : landmark.kind === 'summit'
+          ? new THREE.OctahedronGeometry(0.48, 0)
+          : landmark.kind === 'grove'
+            ? new THREE.IcosahedronGeometry(0.42, 0)
+            : new THREE.TorusKnotGeometry(0.28, 0.08, 48, 6)
+      const material = new THREE.MeshStandardMaterial({
+        color, emissive: color, emissiveIntensity: 1.1,
+        roughness: 0.3, metalness: 0.16,
+      })
+      const marker = new THREE.Mesh(geometry, material)
+      marker.position.set(landmark.x, landmark.elevation + 0.72, landmark.z)
+      marker.userData.landmarkId = landmark.id
+      marker.userData.baseY = marker.position.y
+      this.discoveryGroup.add(marker)
+    })
+  }
+
+
+  updateWorldEvents(events: readonly WorldEvent[]): void {
+    this.eventGroup.traverse(object => {
+      if (object instanceof THREE.Mesh) {
+        object.geometry.dispose()
+        ;(object.material as THREE.Material).dispose()
+      }
+    })
+    this.eventGroup.clear()
+    const half = this.terrain.worldWidth / 2
+    // Keep the journal complete while limiting visible mesh count on mobile GPUs.
+    events.slice(-32).forEach((event, index) => {
+      const gx = THREE.MathUtils.clamp(Math.round((event.x + half) / this.terrain.worldWidth * (this.terrain.size - 1)), 0, this.terrain.size - 1)
+      const gz = THREE.MathUtils.clamp(Math.round((event.z + half) / this.terrain.worldWidth * (this.terrain.size - 1)), 0, this.terrain.size - 1)
+      const y = this.terrain.heights[gz * this.terrain.size + gx]
+      const color = event.kind === 'meteor-shower' ? '#f2c879'
+        : event.kind === 'aurora' ? '#a58cff'
+          : event.kind === 'echo-bloom' ? '#7ed5a8' : '#55d6c2'
+      const geometry = event.kind === 'meteor-shower'
+        ? new THREE.TorusGeometry(0.62, 0.045, 6, 28)
+        : event.kind === 'aurora'
+          ? new THREE.TorusGeometry(0.8, 0.025, 5, 36)
+          : event.kind === 'echo-bloom'
+            ? new THREE.IcosahedronGeometry(0.42, 1)
+            : new THREE.SphereGeometry(0.24, 10, 8)
+      const material = new THREE.MeshStandardMaterial({
+        color, emissive: color, emissiveIntensity: 0.7 + event.intensity * 1.2,
+        transparent: true, opacity: 0.72, roughness: 0.35,
+      })
+      const marker = new THREE.Mesh(geometry, material)
+      marker.position.set(event.x, y + 0.38 + (index % 3) * 0.08, event.z)
+      marker.rotation.x = event.kind === 'aurora' ? Math.PI / 2.8 : Math.PI / 2
+      marker.userData.baseY = marker.position.y
+      marker.userData.phase = index * 0.73
+      marker.userData.kind = event.kind
+      marker.scale.setScalar(0.8 + event.intensity * 0.45)
+      this.eventGroup.add(marker)
+    })
+  }
+
+  pickWorldEventAt(clientX: number, clientY: number): string | null {
+    const rect = this.renderer.domElement.getBoundingClientRect()
+    const pointer = new THREE.Vector2(
+      ((clientX - rect.left) / rect.width) * 2 - 1,
+      -((clientY - rect.top) / rect.height) * 2 + 1,
+    )
+    const raycaster = new THREE.Raycaster()
+    raycaster.setFromCamera(pointer, this.camera)
+    const hit = raycaster.intersectObjects(this.eventGroup.children, false)[0]
+    return hit ? String(hit.object.userData.eventId ?? '') || null : null
+  }
+
+  pickDiscoveryAt(clientX: number, clientY: number): string | null {
+    const rect = this.renderer.domElement.getBoundingClientRect()
+    const pointer = new THREE.Vector2(
+      ((clientX - rect.left) / rect.width) * 2 - 1,
+      -((clientY - rect.top) / rect.height) * 2 + 1,
+    )
+    const raycaster = new THREE.Raycaster()
+    raycaster.setFromCamera(pointer, this.camera)
+    const hit = raycaster.intersectObjects(this.discoveryGroup.children, false)[0]
+    return hit ? String(hit.object.userData.landmarkId ?? '') || null : null
+  }
+
+  clearInspection(): void {
+    this.inspectionMarker.visible = false
+  }
+
+  inspectAt(clientX: number, clientY: number): TerrainInspection | null {
+    const rect = this.renderer.domElement.getBoundingClientRect()
+    const pointer = new THREE.Vector2(
+      ((clientX - rect.left) / rect.width) * 2 - 1,
+      -((clientY - rect.top) / rect.height) * 2 + 1,
+    )
+    const raycaster = new THREE.Raycaster()
+    raycaster.setFromCamera(pointer, this.camera)
+    const hit = raycaster.intersectObject(this.mesh, false)[0]
+    return hit ? this.inspectWorldPoint(hit.point.x, hit.point.z) : null
+  }
+
+  inspectWorldPoint(x: number, z: number): TerrainInspection {
+    const half = this.terrain.worldWidth / 2
+    const worldX = THREE.MathUtils.clamp(x, -half, half)
+    const worldZ = THREE.MathUtils.clamp(z, -half, half)
+    const step = this.terrain.worldWidth / (this.terrain.size - 1)
+    const gx = Math.round((worldX + half) / step)
+    const gz = Math.round((worldZ + half) / step)
+    const elevation = this.terrain.heights[gz * this.terrain.size + gx]
+    const weights = getBiomeWeights(elevation)
+    const biome = weights.highlands >= weights.forest && weights.highlands >= weights.mire
+      ? 'highlands'
+      : weights.forest >= weights.mire ? 'forest' : 'mire'
+    this.inspectionMarker.position.set(worldX, elevation + 0.12, worldZ)
+    this.inspectionMarker.visible = true
+    const target = new THREE.Vector3(worldX, elevation, worldZ)
+    const cameraOffset = this.camera.position.clone().sub(this.controls.target)
+    this.controls.target.copy(target)
+    this.camera.position.copy(target).add(cameraOffset)
+    this.controls.update()
+    return { x: worldX, z: worldZ, elevation, biome }
+  }
+
+  updateTerrain(): void {
+    const positions = this.geometry.attributes.position as THREE.BufferAttribute
+    const colors = this.geometry.attributes.color as THREE.BufferAttribute
+    for (let i = 0; i < this.terrain.heights.length; i++) {
+      const height = this.terrain.heights[i]
+      positions.setY(i, height)
+      const color = this.terrainColor(height)
+      colors.setXYZ(i, color.r, color.g, color.b)
+    }
+    positions.needsUpdate = true
+    colors.needsUpdate = true
+    this.geometry.computeVertexNormals()
+    const half = this.terrain.worldWidth / 2
+    const step = this.terrain.worldWidth / (this.terrain.size - 1)
+    this.eventGroup.children.forEach(object => {
+      if (!(object instanceof THREE.Mesh)) return
+      const col = THREE.MathUtils.clamp(Math.round((object.position.x + half) / step), 0, this.terrain.size - 1)
+      const row = THREE.MathUtils.clamp(Math.round((object.position.z + half) / step), 0, this.terrain.size - 1)
+      const height = this.terrain.heights[row * this.terrain.size + col]
+      object.userData.baseY = height + Number(object.userData.surfaceOffset ?? 0.38)
+    })
+  }
+
+  private updateTerrainColors(): void {
+    const colors = this.geometry.attributes.color as THREE.BufferAttribute
+    for (let i = 0; i < this.terrain.heights.length; i++) {
+      const color = this.terrainColor(this.terrain.heights[i])
+      colors.setXYZ(i, color.r, color.g, color.b)
+    }
+    colors.needsUpdate = true
+  }
+
+  private resize = (): void => {
+    if (this.disposed) return
+    const width = Math.max(1, this.host.clientWidth), height = Math.max(1, this.host.clientHeight)
+    this.camera.aspect = width / height
+    this.camera.updateProjectionMatrix()
+    this.renderer.setSize(width, height, false)
+  }
+
+  private handleVisibilityChange = (): void => {
+    if (document.hidden) {
+      if (this.frame !== 0) cancelAnimationFrame(this.frame)
+      this.frame = 0
+    } else if (!this.disposed && this.frame === 0) {
+      this.animate()
+    }
+  }
+
+  private animate = (): void => {
+    if (this.disposed) return
+    this.frame = requestAnimationFrame(this.animate)
+    const now = performance.now()
+    if (this.reducedMotion && now - this.lastReducedMotionRender < 100) return
+    this.lastReducedMotionRender = now
+    const time = this.reducedMotion ? 0 : now * 0.00025
+    this.tealLight.position.x = -10 + Math.sin(time) * 2.2
+    this.tealLight.position.z = 2 + Math.cos(time * 0.8) * 2
+    this.tealLight.intensity = THREE.MathUtils.lerp(this.tealLight.intensity, this.targetTeal, 0.035)
+    this.violetLight.intensity = THREE.MathUtils.lerp(this.violetLight.intensity, this.targetViolet, 0.035)
+    this.currentPulse = THREE.MathUtils.lerp(this.currentPulse, this.targetPulse, 0.22)
+    this.currentPaletteBlend = THREE.MathUtils.lerp(this.currentPaletteBlend, this.targetPaletteBlend, 0.025)
+    this.currentBiomeEnergy = THREE.MathUtils.lerp(this.currentBiomeEnergy, this.targetBiomeEnergy, 0.04)
+    this.soundMotes.position.set(this.targetAccentX, 0.2, this.targetAccentZ)
+    this.moteMaterial.color.copy(this.tealColor).lerp(this.violetColor, this.currentPaletteBlend)
+    this.moteMaterial.opacity = 0.08 + this.currentBiomeEnergy * 0.42 + this.currentPulse * 0.24
+    this.moteMaterial.size = 0.045 + this.currentBiomeEnergy * 0.1 + this.currentPulse * 0.12
+    const moteAttribute = this.soundMotes.geometry.attributes.position as THREE.BufferAttribute
+    for (let i = 0; i < this.motePhases.length; i++) {
+      const rhythmicBeat = Math.sin(time * 7.5) * this.rhythmStrength * 0.18
+      const phase = this.motePhases[i] + time * (0.32 + this.targetPitchTone * 0.55)
+      const radius = this.moteRadii[i] + this.currentPulse * (1.2 + this.targetPitchTone)
+        + rhythmicBeat
+      const angle = this.moteAngles[i] + phase * 0.22
+      const offset = i * 3
+      this.motePositions[offset] = Math.cos(angle) * radius
+      const verticalMotion = this.soundPattern === 'sustained' ? 1.8 : 0.6
+      this.motePositions[offset + 1] = 0.25 + Math.sin(phase * verticalMotion) * (0.18 + this.currentBiomeEnergy * 0.6)
+      this.motePositions[offset + 2] = Math.sin(angle) * radius
+    }
+    moteAttribute.needsUpdate = true
+    this.soundRipples.forEach(ring => {
+      const phase = (time * (0.42 + this.targetPitchTone * 0.48) + Number(ring.userData.phase)) % 1
+      const envelope = 1 - phase
+      const radius = 0.55 + phase * (2.2 + this.targetPitchTone * 1.5) + this.currentBiomeEnergy * 0.35
+      ring.position.set(this.targetAccentX, 0.12, this.targetAccentZ)
+      ring.scale.setScalar(radius)
+      ring.visible = this.currentPulse > 0.018
+      ;(ring.material as THREE.MeshBasicMaterial).opacity = this.currentPulse * envelope * 0.58
+      ;(ring.material as THREE.MeshBasicMaterial).color.copy(this.tealColor).lerp(this.violetColor, this.currentPaletteBlend)
+    })
+    if (now - this.lastTerrainColorUpdate >= 120) {
+      this.updateTerrainColors()
+      this.lastTerrainColorUpdate = now
+    }
+    this.water.rotation.y = Math.sin(time * 1.8) * 0.012
+    const rhythmicWaterPulse = Math.max(0, Math.sin(time * 7.5)) * this.rhythmStrength * 0.32
+    this.waterMaterial.emissiveIntensity = 0.24 + Math.sin(time * 2.2) * 0.08 + rhythmicWaterPulse
+    this.waterMaterial.opacity = 0.68 + Math.sin(time * 1.3) * 0.035
+    this.waterRing.rotation.z = Math.sin(time * 0.7) * 0.025
+    this.flora.rotation.z = Math.sin(time * 1.7) * 0.006
+    this.flora.children.forEach(species => {
+      species.children.forEach(object => {
+        if (!(object instanceof THREE.InstancedMesh) || object.userData.biome === undefined) return
+        const biome = String(object.userData.biome)
+        const phase = Number(object.userData.pulseOffset) || 0
+        const frequency = biome === 'mire' ? 1.25 : biome === 'forest' ? 0.72 : 1.8
+        const pulse = (Math.sin(time * frequency * 3 + phase) + 1) * 0.5
+        const onsetBoost = this.currentPulse * (biome === 'highlands' ? 1.35 : 0.85)
+        const rhythmicBoost = this.rhythmStrength * Math.max(0, Math.sin(time * 7.5 + phase)) * 0.65
+        const energyBoost = this.currentBiomeEnergy * (biome === 'forest' ? 0.75 : 1.1)
+        const material = object.material as THREE.MeshStandardMaterial
+        material.emissiveIntensity = 0.85 + pulse * 0.7 + energyBoost + onsetBoost + rhythmicBoost
+        const breath = 1 + pulse * 0.025 + onsetBoost * 0.018
+        object.scale.setScalar(breath)
+      })
+    })
+    this.discoveryGroup.children.forEach((object, index) => {
+      if (!(object instanceof THREE.Mesh)) return
+      object.rotation.y = time * (0.42 + index * 0.08)
+      object.position.y = Number(object.userData.baseY) + Math.sin(time * 1.8 + index) * 0.12
+    })
+    this.eventGroup.children.forEach(object => {
+      if (!(object instanceof THREE.Mesh)) return
+      const phase = Number(object.userData.phase) || 0
+      if (!this.reducedMotion) object.rotation.z += object.userData.kind === 'meteor-shower' ? 0.0018 : 0.0007
+      object.position.y = Number(object.userData.baseY) + (this.reducedMotion ? 0 : Math.sin(time * 1.25 + phase) * 0.09)
+      const material = object.material as THREE.MeshStandardMaterial
+      material.emissiveIntensity = 0.65 + this.currentPulse * 0.28
+    })
+    this.floatingRocks.rotation.y = time * (0.045 + this.rhythmStrength * 0.055)
+    this.floatingRocks.scale.setScalar(1 + (this.soundPattern === 'accent' ? this.currentPulse * 0.045 : 0))
+    const rockMaterial = this.floatingRocks.material as THREE.MeshStandardMaterial
+    rockMaterial.emissiveIntensity = 0.22 + this.currentBiomeEnergy * 0.55 + this.currentPulse * 0.75
+    rockMaterial.emissive.copy(this.rockBaseColor).lerp(this.rockAccentColor, this.currentPaletteBlend)
+    this.clouds.children.forEach(cluster => {
+      const phase = Number(cluster.userData.phase) || 0
+      const baseX = Number(cluster.userData.baseX) || 0
+      const cloudDrift = this.soundPattern === 'sustained' ? 1.8 : this.soundPattern === 'rhythmic' ? 1.25 : 0.7
+      cluster.position.x = baseX + Math.sin(time * cloudDrift + phase) * (0.18 + this.currentBiomeEnergy * 0.32)
+      cluster.position.y = (Number(cluster.userData.baseY) || 0) + Math.sin(time * 0.35 + phase) * 0.08
+      cluster.rotation.y = Math.sin(time * 0.4 + phase) * 0.035
+      cluster.children.forEach(puff => {
+        if (!(puff instanceof THREE.Mesh)) return
+        const material = puff.material as THREE.MeshStandardMaterial
+        material.color.copy(this.cloudBaseColor).lerp(this.cloudAccentColor, this.currentPaletteBlend)
+        material.opacity = 0.1 + this.currentBiomeEnergy * 0.08 + this.currentPulse * 0.045
+      })
+    })
+    this.targetPulse *= 0.9
+    this.accentLight.intensity = this.currentPulse * 5.5
+    this.accentLight.position.set(this.targetAccentX, 2.5, this.targetAccentZ)
+    if (!this.reducedMotion) {
+      const mistPositions = this.mist.geometry.attributes.position as THREE.BufferAttribute
+      for (let i = 0; i < this.mistPhases.length; i++) {
+        const offset = i * 3
+        this.mistPositions[offset] += Math.sin(time * 2 + this.mistPhases[i]) * 0.0018
+        this.mistPositions[offset + 1] += Math.sin(time * 1.4 + this.mistPhases[i]) * 0.0012
+        if (this.mistPositions[offset] > this.terrain.worldWidth / 2) this.mistPositions[offset] = -this.terrain.worldWidth / 2
+        if (this.mistPositions[offset] < -this.terrain.worldWidth / 2) this.mistPositions[offset] = this.terrain.worldWidth / 2
+      }
+      mistPositions.needsUpdate = true
+    }
+    this.mist.rotation.y = Math.sin(time * 0.35) * 0.025
+    this.stars.rotation.y = time * 0.018
+    this.controls.update()
+    this.renderer.render(this.scene, this.camera)
+  }
+
+  dispose(): void {
+    if (this.disposed) return
+    this.disposed = true
+    cancelAnimationFrame(this.frame)
+    window.removeEventListener('resize', this.resize)
+    this.resizeObserver?.disconnect()
+    this.resizeObserver = null
+    document.removeEventListener('visibilitychange', this.handleVisibilityChange)
+    this.controls.dispose()
+    this.updateSoundTraces([])
+    for (const object of [
+      this.discoveryGroup, this.eventGroup, this.inspectionMarker, this.soundMotes,
+      ...this.soundRipples, this.water, this.waterRing, this.mist, this.stars,
+      this.crystals, this.flora, this.floatingRocks, this.clouds,
+    ]) disposeObjectResources(object)
+    this.geometry.dispose()
+    ;(this.mesh.material as THREE.Material).dispose()
+    this.renderer.dispose()
+    this.renderer.domElement.remove()
+  }
+}
