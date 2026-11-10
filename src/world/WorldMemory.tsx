@@ -56,11 +56,11 @@ export function WorldMemory({ terrain, history, discoveredIds, events, stop, onW
 
   const replay = () => {
     stop()
-    const events = history.current.map(item => ({ features: { ...item.features }, deltaSeconds: item.deltaSeconds }))
-    const replayed = replayTerrain(terrain.seed, terrain.size, terrain.worldWidth, events)
+    const replayHistory = history.current.map(item => ({ features: { ...item.features }, deltaSeconds: item.deltaSeconds }))
+    const replayed = replayTerrain(terrain.seed, terrain.size, terrain.worldWidth, replayHistory)
     terrain.heights.set(replayed.heights)
     terrain.frontX = replayed.frontX
-    onWorldChange(events.length, discoveredIds, events)
+    onWorldChange(replayHistory.length, discoveredIds, events)
     setMessage('Creation replayed from the recorded acoustic feature stream.')
   }
 
@@ -78,7 +78,7 @@ export function WorldMemory({ terrain, history, discoveredIds, events, stop, onW
       document.body.appendChild(anchor)
       anchor.click()
       anchor.remove()
-      URL.revokeObjectURL(url)
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000)
       setMessage('World export prepared as a .synworld.json file.')
     } catch (e) { setMessage(e instanceof Error ? e.message : 'Could not export this world.') }
     finally { setBusy(false) }
@@ -91,6 +91,9 @@ export function WorldMemory({ terrain, history, discoveredIds, events, stop, onW
       if (file.size > 20 * 1024 * 1024) throw new Error('World files must be smaller than 20 MB.')
       const parsed: unknown = JSON.parse(await file.text())
       const record = parseWorldFile(parsed)
+      if (record.size !== terrain.size || record.worldWidth !== terrain.worldWidth) {
+        throw new Error('This world uses a different terrain resolution or world size and cannot be loaded by this version.')
+      }
       await saveWorld(record)
       await refresh()
       setSelected(record.id)
@@ -147,7 +150,8 @@ export function WorldMemory({ terrain, history, discoveredIds, events, stop, onW
           <WorldPreview values={world.preview} />
           <span className="world-card-name">{world.name}</span>
           <span className="world-card-meta">{new Date(world.savedAt).toLocaleDateString()} · SEED {world.seed}</span>
-          <span className="world-card-meta">{world.sculptCount.toLocaleString()} ACOUSTIC EVENTS</span>
+          <span className="world-card-meta">{world.sculptCount.toLocaleString()} SCULPT SAMPLES</span>
+          <span className="world-card-meta">{world.eventCount} PHENOMENA · {world.discoveredBiomeCount} BIOMES FOUND</span>
           <span className="world-card-meta">{world.discoveredCount} / {world.landmarkCount} LANDMARKS · {world.explorationPercent}% EXPLORED</span>
           <span className="world-exploration-track" role="progressbar" aria-label={world.name + ' exploration'} aria-valuemin={0} aria-valuemax={100} aria-valuenow={world.explorationPercent}><span style={{ width: world.explorationPercent + '%' }} /></span>
         </button>)}
