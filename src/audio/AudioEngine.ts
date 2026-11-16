@@ -1,6 +1,8 @@
 import { extractFeatures, type AcousticFeatures } from './features'
+import type { AudioInput } from './AudioInput'
 
-export class AudioEngine {
+export class AudioEngine implements AudioInput {
+  readonly kind = 'microphone' as const
   private context: AudioContext | null = null
   private stream: MediaStream | null = null
   private analyser: AnalyserNode | null = null
@@ -11,7 +13,7 @@ export class AudioEngine {
   private frequencyData: Uint8Array | null = null
   private cancelled = false
 
-  async start(onFeatures: (features: AcousticFeatures) => void): Promise<void> {
+  async start(onFeatures: (features: AcousticFeatures) => void, _onEnded?: () => void): Promise<void> {
     if (!navigator.mediaDevices?.getUserMedia) throw new Error('Microphone access is unavailable. Use localhost or HTTPS in a modern browser.')
     this.stop()
     this.cancelled = false
