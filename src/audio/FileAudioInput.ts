@@ -19,12 +19,14 @@ export class FileAudioInput implements AudioInput {
   private frequencyData: Uint8Array | null = null
   private objectUrl: string | null = null
   private cancelled = false
+  private onEnded: (() => void) | null = null
 
   constructor(private readonly file: File) {}
 
-  async start(onFeatures: (features: AcousticFeatures) => void): Promise<void> {
+  async start(onFeatures: (features: AcousticFeatures) => void, onEnded?: () => void): Promise<void> {
     this.stop()
     this.cancelled = false
+    this.onEnded = onEnded ?? null
 
     const context = new AudioContext()
     const element = new Audio()
@@ -77,7 +79,9 @@ export class FileAudioInput implements AudioInput {
   }
 
   private handleEnded = () => {
+    const onEnded = this.onEnded
     this.stop()
+    onEnded?.()
   }
 
   stop(): void {
@@ -97,6 +101,7 @@ export class FileAudioInput implements AudioInput {
     this.timeData = null
     this.frequencyData = null
     this.objectUrl = null
+    this.onEnded = null
     this.previousRms = 0
     this.lastAnalysisAt = 0
   }
