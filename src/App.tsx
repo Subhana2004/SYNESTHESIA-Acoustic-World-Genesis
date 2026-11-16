@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AudioEngine } from './audio/AudioEngine'
+import { FileAudioInput } from './audio/FileAudioInput'
+import type { AudioInput } from './audio/AudioInput'
 import { mapAtmosphere, type AcousticFeatures } from './audio/features'
 import { createTerrain, sculptTerrain } from './world/terrain'
 import type { WorldScene } from './world/WorldScene'
@@ -18,7 +20,8 @@ const terrain = createTerrain()
 export default function App() {
   const viewport = useRef<HTMLDivElement>(null)
   const scene = useRef<WorldScene | null>(null)
-  const audio = useRef<AudioEngine | null>(null)
+  const audio = useRef<AudioInput | null>(null)
+  const filePicker = useRef<HTMLInputElement>(null)
   const lastUpdate = useRef(0)
   const startAttempt = useRef(0)
   const history = useRef<RecordedSculpt[]>([])
@@ -28,6 +31,7 @@ export default function App() {
   const pointerStart = useRef<{ x: number; y: number } | null>(null)
   const pendingInspection = useRef<TerrainInspection | null>(null)
   const [listening, setListening] = useState(false)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [starting, setStarting] = useState(false)
   const [error, setError] = useState('')
   const [sceneError, setSceneError] = useState('')
@@ -91,7 +95,7 @@ export default function App() {
     const attempt = ++startAttempt.current
     setStarting(true)
     setError('')
-    const engine = new AudioEngine()
+    const engine: AudioInput = selectedFile ? new FileAudioInput(selectedFile) : new AudioEngine()
     audio.current = engine
     try {
       await engine.start((f) => {
@@ -126,6 +130,8 @@ export default function App() {
           scene.current?.updateAcousticAtmosphere(mapAtmosphere(f), terrain.frontX)
           setUpdates(v => v + 1)
         }
+      }, () => {
+        if (attempt === startAttempt.current) stop()
       })
       if (attempt !== startAttempt.current) {
         engine.stop()
@@ -279,12 +285,15 @@ export default function App() {
       <div className="instrument">
         <div className="eyebrow">THE ACOUSTIC INSTRUMENT</div>
         <h2>{listening ? 'Your world is listening.' : 'Make the first sound.'}</h2>
-        <p>{listening ? 'Change your pitch, volume, and rhythm. The terrain will keep what you create.' : 'Microphone access starts only when you choose. No speech recognition, no uploads.'}</p>
+        <p>{listening ? 'Change your pitch, volume, and rhythm. The terrain will keep what you create.' : 'Choose a local music file or use your microphone. Audio is analysed in your browser and is not uploaded.'}</p>
         {error && <p className="error" role="alert">{error}</p>}
-        <div className="actions">
-          {!listening ? <button className="primary" onClick={start} disabled={starting || sceneLoading || Boolean(sceneError)}><i /> {starting ? 'Requesting microphone…' : 'Begin listening'}</button> : <button className="primary pause" onClick={stop}><i /> Pause input</button>}
+        <div className="actions audio-source-actions">
+          {!listening ? <button className="primary" onClick={start} disabled={starting || sceneLoading || Boolean(sceneError)}><i /> {starting ? 'Starting audio…' : selectedFile ? 'Play & analyse track' : 'Begin listening'}</button> : <button className="primary pause" onClick={stop}><i /> Stop audio</button>}
+          <button className="secondary" type="button" onClick={() => filePicker.current?.click()} disabled={listening || starting}>Choose music</button>
           <button className="secondary" onClick={reset}>Reset world</button>
+          <input ref={filePicker} className="audio-file-picker" type="file" accept="audio/*,.mp3,.wav,.m4a,.ogg,.flac" aria-label="Choose an audio file" onChange={event => setSelectedFile(event.target.files?.[0] ?? null)} />
         </div>
+        <p className="audio-source-status" aria-live="polite">{selectedFile ? `TRACK SELECTED · ${selectedFile.name}` : 'INPUT SOURCE · MICROPHONE'} · AUDIO IS PROCESSED LOCALLY</p>
       </div>
       <WorldMemory terrain={terrain} history={history} discoveredIds={discoveredIds} events={worldEvents} stop={stop} onWorldChange={(count, restoredDiscoveredIds = [], restoredEvents = []) => {
         scene.current?.rebuildWorldEnvironment()
@@ -315,6 +324,6 @@ export default function App() {
         <div><span>SPECTRAL CENTROID</span><strong>{features ? Math.round(features.spectralCentroidHz).toLocaleString() : '—'}</strong><small>HZ · SPECTRAL BRIGHTNESS</small></div>
       </div>
     </section>
-    <footer><span>DESIGNED TO BE PERFORMED, NOT PROMPTED.</span><span>NO AUDIO IS STORED OR TRANSMITTED.</span></footer>
+    <footer><span>DESIGNED TO BE PERFORMED, NOT PROMPTED.</span><span>AUDIO IS PROCESSED LOCALLY; FILES ARE NOT UPLOADED.</span></footer>
   </main>
 }
