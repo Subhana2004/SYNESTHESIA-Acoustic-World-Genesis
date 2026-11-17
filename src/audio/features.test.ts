@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { estimatePitch, mapAcoustics, mapAtmosphere, type AcousticFeatures } from './features'
+import { estimatePitch, extractFeatures, mapAcoustics, mapAtmosphere, type AcousticFeatures } from './features'
 
 function sine(frequency: number, sampleRate = 48000, size = 2048): Float32Array {
   return Float32Array.from({ length: size }, (_, i) => Math.sin(2 * Math.PI * frequency * i / sampleRate) * 0.5)
@@ -83,5 +83,41 @@ describe('atmosphere mapping', () => {
     expect(controls.onsetPulse).toBe(0)
     expect(controls.energy).toBe(0)
     expect(controls.pitchTone).toBe(0.35)
+  })
+})
+
+describe('expanded acoustic feature extraction', () => {
+  it('separates bass, mid, and treble spectral energy', () => {
+    const time = sine(110)
+    const bass = new Uint8Array(1024); bass[4] = 255
+    const mid = new Uint8Array(1024); mid[40] = 255
+    const treble = new Uint8Array(1024); treble[240] = 255
+    const bassFeatures = extractFeatures(time, bass, 48000, 0, 100)
+    const midFeatures = extractFeatures(time, mid, 48000, 0, 100)
+    const trebleFeatures = extractFeatures(time, treble, 48000, 0, 100)
+    expect(bassFeatures.bassEnergy).toBe(1)
+    expect(midFeatures.midEnergy).toBe(1)
+    expect(trebleFeatures.trebleEnergy).toBe(1)
+  })
+
+  it('reports zero-crossing rate and spectral rolloff', () => {
+    const alternating = Float32Array.from({ length: 8 }, (_, i) => i % 2 ? 0.5 : -0.5)
+    const spectrum = new Uint8Array(16)
+    spectrum[2] = 255
+    spectrum[8] = 255
+    const features = extractFeatures(alternating, spectrum, 48000, 0, 123)
+    expect(features.zeroCrossingRate).toBe(1)
+    expect(features.spectralRolloffHz).toBeGreaterThan(0)
+    expect(features.timestamp).toBe(123)
+  })
+
+  it('keeps spectral descriptors finite and bounded for silence', () => {
+    const features = extractFeatures(new Float32Array(128), new Uint8Array(64), 48000, 0, 0)
+    expect(features.bassEnergy).toBe(0)
+    expect(features.midEnergy).toBe(0)
+    expect(features.trebleEnergy).toBe(0)
+    expect(features.spectralFlatness).toBe(0)
+    expect(features.zeroCrossingRate).toBe(0)
+    expect(features.spectralRolloffHz).toBe(0)
   })
 })
