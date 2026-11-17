@@ -30,6 +30,10 @@ export interface AtmosphereControls {
   onsetPulse: number
   energy: number
   pitchTone: number
+  bass: number
+  mid: number
+  treble: number
+  texture: number
 }
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v))
@@ -47,6 +51,11 @@ export function mapAtmosphere(f: AcousticFeatures): AtmosphereControls {
     pitchTone: f.isSilent || f.pitchHz === null || f.pitchConfidence < 0.72
       ? 0.35
       : clamp(Math.log2(f.pitchHz / 65) / Math.log2(1000 / 65), 0, 1),
+    // Equal thirds are a neutral fallback for older saved histories without band data.
+    bass: f.isSilent ? 1 / 3 : clamp(f.bassEnergy ?? 1 / 3, 0, 1),
+    mid: f.isSilent ? 1 / 3 : clamp(f.midEnergy ?? 1 / 3, 0, 1),
+    treble: f.isSilent ? 1 / 3 : clamp(f.trebleEnergy ?? 1 / 3, 0, 1),
+    texture: f.isSilent ? 0 : clamp(f.spectralFlatness ?? 0, 0, 1),
   }
 }
 
