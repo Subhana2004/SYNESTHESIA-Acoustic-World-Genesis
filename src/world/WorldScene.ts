@@ -64,6 +64,14 @@ export class WorldScene {
   private clouds: THREE.Group
   private soundRipples: THREE.Mesh[] = []
   private targetPitchTone = 0.35
+  private targetBass = 1 / 3
+  private targetMid = 1 / 3
+  private targetTreble = 1 / 3
+  private targetTexture = 0
+  private currentBass = 1 / 3
+  private currentMid = 1 / 3
+  private currentTreble = 1 / 3
+  private currentTexture = 0
   private soundMotes: THREE.Points
   private motePositions: Float32Array
   private motePhases: Float32Array
@@ -245,6 +253,10 @@ export class WorldScene {
     const blend = THREE.MathUtils.clamp(controls.spectralBlend, 0, 1)
     this.targetPaletteBlend = blend
     this.targetPitchTone = THREE.MathUtils.clamp(controls.pitchTone, 0, 1)
+    this.targetBass = THREE.MathUtils.clamp(controls.bass, 0, 1)
+    this.targetMid = THREE.MathUtils.clamp(controls.mid, 0, 1)
+    this.targetTreble = THREE.MathUtils.clamp(controls.treble, 0, 1)
+    this.targetTexture = THREE.MathUtils.clamp(controls.texture, 0, 1)
     const energy = THREE.MathUtils.clamp(controls.energy, 0, 1)
     this.targetBiomeEnergy = energy
     const pattern = updateSoundPattern(
@@ -502,6 +514,10 @@ export class WorldScene {
     this.targetPaletteBlend = 0.35
     this.currentPaletteBlend = 0.35
     this.targetPitchTone = 0.35
+    this.targetBass = this.currentBass = 1 / 3
+    this.targetMid = this.currentMid = 1 / 3
+    this.targetTreble = this.currentTreble = 1 / 3
+    this.targetTexture = this.currentTexture = 0
     this.targetTeal = 0.55
     this.targetViolet = 0.35
     this.targetAccentX = this.terrain.frontX
@@ -778,6 +794,10 @@ export class WorldScene {
     this.currentPulse = THREE.MathUtils.lerp(this.currentPulse, this.targetPulse, 0.22)
     this.currentPaletteBlend = THREE.MathUtils.lerp(this.currentPaletteBlend, this.targetPaletteBlend, 0.025)
     this.currentBiomeEnergy = THREE.MathUtils.lerp(this.currentBiomeEnergy, this.targetBiomeEnergy, 0.04)
+    this.currentBass = THREE.MathUtils.lerp(this.currentBass, this.targetBass, 0.045)
+    this.currentMid = THREE.MathUtils.lerp(this.currentMid, this.targetMid, 0.045)
+    this.currentTreble = THREE.MathUtils.lerp(this.currentTreble, this.targetTreble, 0.045)
+    this.currentTexture = THREE.MathUtils.lerp(this.currentTexture, this.targetTexture, 0.045)
     this.soundMotes.position.set(this.targetAccentX, 0.2, this.targetAccentZ)
     this.moteMaterial.color.copy(this.tealColor).lerp(this.violetColor, this.currentPaletteBlend)
     this.moteMaterial.opacity = 0.08 + this.currentBiomeEnergy * 0.42 + this.currentPulse * 0.24
@@ -812,7 +832,8 @@ export class WorldScene {
     }
     this.water.rotation.y = Math.sin(time * 1.8) * 0.012
     const rhythmicWaterPulse = Math.max(0, Math.sin(time * 7.5)) * this.rhythmStrength * 0.32
-    this.waterMaterial.emissiveIntensity = 0.24 + Math.sin(time * 2.2) * 0.08 + rhythmicWaterPulse
+    // Bass deepens the basin glow; treble adds finer, brighter surface shimmer.
+    this.waterMaterial.emissiveIntensity = 0.18 + this.currentBass * 0.38 + this.currentTreble * 0.16 + Math.sin(time * (1.4 + this.currentTreble * 2.2)) * (0.025 + this.currentTreble * 0.07) + rhythmicWaterPulse
     this.waterMaterial.opacity = 0.68 + Math.sin(time * 1.3) * 0.035
     this.waterRing.rotation.z = Math.sin(time * 0.7) * 0.025
     this.flora.rotation.z = Math.sin(time * 1.7) * 0.006
@@ -826,9 +847,11 @@ export class WorldScene {
         const onsetBoost = this.currentPulse * (biome === 'highlands' ? 1.35 : 0.85)
         const rhythmicBoost = this.rhythmStrength * Math.max(0, Math.sin(time * 7.5 + phase)) * 0.65
         const energyBoost = this.currentBiomeEnergy * (biome === 'forest' ? 0.75 : 1.1)
+        const bandBoost = biome === 'mire' ? this.currentBass : biome === 'forest' ? this.currentMid : this.currentTreble
+        const textureBoost = this.currentTexture * (biome === 'highlands' ? 0.28 : 0.12)
         const material = object.material as THREE.MeshStandardMaterial
-        material.emissiveIntensity = 0.85 + pulse * 0.7 + energyBoost + onsetBoost + rhythmicBoost
-        const breath = 1 + pulse * 0.025 + onsetBoost * 0.018
+        material.emissiveIntensity = 0.78 + pulse * 0.62 + energyBoost + bandBoost * 0.42 + textureBoost + onsetBoost + rhythmicBoost
+        const breath = 1 + pulse * 0.02 + bandBoost * 0.018 + onsetBoost * 0.018
         object.scale.setScalar(breath)
       })
     })
