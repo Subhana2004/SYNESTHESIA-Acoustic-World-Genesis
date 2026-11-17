@@ -30,10 +30,10 @@ export interface AtmosphereControls {
   onsetPulse: number
   energy: number
   pitchTone: number
-  bass: number
-  mid: number
-  treble: number
-  texture: number
+  bass?: number
+  mid?: number
+  treble?: number
+  texture?: number
 }
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v))
