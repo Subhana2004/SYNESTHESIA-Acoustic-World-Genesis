@@ -6,6 +6,16 @@ export interface AcousticFeatures {
   spectralCentroidHz: number
   onsetStrength: number
   isSilent: boolean
+  /** Normalized spectral energy in bass (20–250 Hz), mid (250–2,000 Hz), and treble (2,000 Hz+). */
+  bassEnergy?: number
+  midEnergy?: number
+  trebleEnergy?: number
+  /** Spectral flatness: near 0 is tonal, near 1 is noise-like. */
+  spectralFlatness?: number
+  /** Fraction of samples that cross zero. */
+  zeroCrossingRate?: number
+  /** Frequency below which 85% of spectral magnitude is concentrated. */
+  spectralRolloffHz?: number
 }
 
 export interface AcousticControls {
@@ -87,22 +97,59 @@ export function estimatePitch(samples: Float32Array, sampleRate: number): { pitc
   return { pitchHz: effectiveRate / bestLag, confidence: clamp(correlations[bestLag], 0, 1) }
 }
 
+/** Extracts lightweight time- and frequency-domain descriptors from one analyser frame. */
 export function extractFeatures(time: Float32Array, spectrum: Uint8Array, sampleRate: number, previousRms = 0, timestamp = performance.now()): AcousticFeatures {
   let sum = 0
-  for (let i = 0; i < time.length; i++) sum += time[i] * time[i]
+  let crossings = 0
+  for (let i = 0; i < time.length; i++) {
+    sum += time[i] * time[i]
+    if (i > 0 && ((time[i - 1] < 0 && time[i] >= 0) || (time[i - 1] >= 0 && time[i] < 0))) crossings++
+  }
   const rms = Math.sqrt(sum / Math.max(1, time.length))
   const pitch = estimatePitch(time, sampleRate)
-  let weighted = 0, total = 0
+  let weighted = 0, total = 0, bass = 0, mid = 0, treble = 0
+  let logMagnitudeSum = 0, positiveBins = 0
+  const magnitudes = new Float32Array(spectrum.length)
   for (let i = 0; i < spectrum.length; i++) {
     const magnitude = spectrum[i] / 255
-    weighted += (i / spectrum.length) * (sampleRate / 2) * magnitude
+    const frequency = i * sampleRate / (2 * spectrum.length)
+    magnitudes[i] = magnitude
+    weighted += frequency * magnitude
     total += magnitude
+    if (frequency < 250) bass += magnitude * magnitude
+    else if (frequency < 2000) mid += magnitude * magnitude
+    else treble += magnitude * magnitude
+    if (magnitude > 0) {
+      logMagnitudeSum += Math.log(magnitude)
+      positiveBins++
+    }
   }
+  const powerTotal = bass + mid + treble
+  let rolloffHz = 0
+  if (total > 0) {
+    let cumulative = 0
+    for (let i = 0; i < magnitudes.length; i++) {
+      cumulative += magnitudes[i]
+      if (cumulative >= total * 0.85) {
+        rolloffHz = i * sampleRate / (2 * magnitudes.length)
+        break
+      }
+    }
+  }
+  const silent = rms < 0.012
   return {
     timestamp, rms, pitchHz: pitch.pitchHz, pitchConfidence: pitch.confidence,
     spectralCentroidHz: total > 0 ? weighted / total : 0,
     onsetStrength: clamp((rms - previousRms) * 8, 0, 1),
-    isSilent: rms < 0.012,
+    isSilent: silent,
+    bassEnergy: !silent && powerTotal > 0 ? bass / powerTotal : 0,
+    midEnergy: !silent && powerTotal > 0 ? mid / powerTotal : 0,
+    trebleEnergy: !silent && powerTotal > 0 ? treble / powerTotal : 0,
+    spectralFlatness: positiveBins > 0 && total > 0
+      ? clamp(Math.exp(logMagnitudeSum / positiveBins) / (total / spectrum.length), 0, 1)
+      : 0,
+    zeroCrossingRate: time.length > 1 ? crossings / (time.length - 1) : 0,
+    spectralRolloffHz: rolloffHz,
   }
 }
 
