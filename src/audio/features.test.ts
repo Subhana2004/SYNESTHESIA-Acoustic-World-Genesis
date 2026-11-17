@@ -121,3 +121,27 @@ describe('expanded acoustic feature extraction', () => {
     expect(features.spectralRolloffHz).toBe(0)
   })
 })
+
+describe('spectral balance mapping', () => {
+  it('passes normalized frequency bands and texture into atmosphere controls', () => {
+    const controls = mapAtmosphere({
+      ...sample,
+      bassEnergy: 0.62,
+      midEnergy: 0.28,
+      trebleEnergy: 0.1,
+      spectralFlatness: 0.74,
+    })
+    expect(controls.bass).toBe(0.62)
+    expect(controls.mid).toBe(0.28)
+    expect(controls.treble).toBe(0.1)
+    expect(controls.texture).toBe(0.74)
+  })
+
+  it('uses neutral spectral balance for older feature histories', () => {
+    const controls = mapAtmosphere(sample)
+    expect(controls.bass).toBeCloseTo(1 / 3)
+    expect(controls.mid).toBeCloseTo(1 / 3)
+    expect(controls.treble).toBeCloseTo(1 / 3)
+    expect(controls.texture).toBe(0)
+  })
+})
