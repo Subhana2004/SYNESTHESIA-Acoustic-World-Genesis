@@ -69,7 +69,7 @@ test('saves, exports, imports, restores, renames and deletes a world', async ({ 
   const portableWorld = JSON.parse(fs.readFileSync(filePath, 'utf8'))
   portableWorld.world.seed = 2027
   portableWorld.world.events = [{ id: 'event-2027-1', kind: 'meteor-shower', biome: 'forest', x: 0, z: 0, intensity: 0.8, timestamp: 1000 }]
-  await page.locator('input[type="file"]').setInputFiles({ name: 'alternate-seed.synworld.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(portableWorld)) })
+  await page.locator('.world-file-input').setInputFiles({ name: 'alternate-seed.synworld.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(portableWorld)) })
   await expect(page.locator('.memory-message')).toContainText('imported into this browser')
   await expect(page.locator('.world-card')).toHaveCount(2)
 
@@ -109,7 +109,7 @@ test('starts and pauses a fake microphone stream', async ({ page, context }) => 
   await page.goto('/')
   await page.getByRole('button', { name: /Begin listening/i }).click()
   await expect(page.locator('.world-head')).toContainText('LISTENING')
-  await page.getByRole('button', { name: /Pause input/i }).click()
+  await page.getByRole('button', { name: /Stop audio/i }).click()
   await expect(page.locator('.world-head')).toContainText('WORLD AT REST')
 })
 
