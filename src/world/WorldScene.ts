@@ -253,10 +253,10 @@ export class WorldScene {
     const blend = THREE.MathUtils.clamp(controls.spectralBlend, 0, 1)
     this.targetPaletteBlend = blend
     this.targetPitchTone = THREE.MathUtils.clamp(controls.pitchTone, 0, 1)
-    this.targetBass = THREE.MathUtils.clamp(controls.bass, 0, 1)
-    this.targetMid = THREE.MathUtils.clamp(controls.mid, 0, 1)
-    this.targetTreble = THREE.MathUtils.clamp(controls.treble, 0, 1)
-    this.targetTexture = THREE.MathUtils.clamp(controls.texture, 0, 1)
+    this.targetBass = THREE.MathUtils.clamp(controls.bass ?? 1 / 3, 0, 1)
+    this.targetMid = THREE.MathUtils.clamp(controls.mid ?? 1 / 3, 0, 1)
+    this.targetTreble = THREE.MathUtils.clamp(controls.treble ?? 1 / 3, 0, 1)
+    this.targetTexture = THREE.MathUtils.clamp(controls.texture ?? 0, 0, 1)
     const energy = THREE.MathUtils.clamp(controls.energy, 0, 1)
     this.targetBiomeEnergy = energy
     const pattern = updateSoundPattern(
