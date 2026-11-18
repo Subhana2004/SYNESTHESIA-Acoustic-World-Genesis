@@ -47,7 +47,7 @@ describe('sound pattern classification', () => {
       result = updateSoundPattern(state, 0.2, 0.9, time)
       state = result.state
     }
-    expect(result.state.onsetTimes).toHaveLength(5)
+    expect(result.state.onsetTimes).toHaveLength(7)
   })
 
   it('estimates tempo from a steady 120 BPM pulse', () => {
@@ -78,7 +78,7 @@ describe('sound pattern classification', () => {
     let state = initial()
     let result = updateSoundPattern(state, 0.2, 0.9, 1000)
     state = result.state
-    for (const time of [1300, 1600, 1900, 2200]) {
+    for (const time of [2250, 3500, 4750, 6000]) {
       result = updateSoundPattern(state, 0.2, 0.9, time)
       state = result.state
     }
