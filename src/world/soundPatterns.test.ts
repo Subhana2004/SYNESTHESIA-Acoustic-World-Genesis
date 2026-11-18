@@ -49,4 +49,40 @@ describe('sound pattern classification', () => {
     }
     expect(result.state.onsetTimes).toHaveLength(5)
   })
+
+  it('estimates tempo from a steady 120 BPM pulse', () => {
+    let state = initial()
+    let result = updateSoundPattern(state, 0.2, 0.9, 1000)
+    state = result.state
+    for (const time of [1500, 2000, 2500, 3000]) {
+      result = updateSoundPattern(state, 0.2, 0.9, time)
+      state = result.state
+    }
+    expect(result.tempoBpm).toBeCloseTo(120)
+    expect(result.beatIntervalMs).toBe(500)
+    expect(result.tempoConfidence).toBeGreaterThan(0.95)
+  })
+
+  it('uses the median interval to resist one timing outlier', () => {
+    let state = initial()
+    let result = updateSoundPattern(state, 0.2, 0.9, 1000)
+    state = result.state
+    for (const time of [1500, 2000, 2560, 3000, 3500]) {
+      result = updateSoundPattern(state, 0.2, 0.9, time)
+      state = result.state
+    }
+    expect(result.tempoBpm).toBeCloseTo(120)
+  })
+
+  it('does not report tempo outside its supported range', () => {
+    let state = initial()
+    let result = updateSoundPattern(state, 0.2, 0.9, 1000)
+    state = result.state
+    for (const time of [1300, 1600, 1900, 2200]) {
+      result = updateSoundPattern(state, 0.2, 0.9, time)
+      state = result.state
+    }
+    expect(result.tempoBpm).toBeNull()
+    expect(result.tempoConfidence).toBe(0)
+  })
 })
